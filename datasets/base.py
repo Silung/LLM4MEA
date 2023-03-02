@@ -113,6 +113,12 @@ class AbstractDataset(metaclass=ABCMeta):
         dataset = pickle.load(dataset_path.open('rb'))
         return dataset
 
+    '''
+    description: 过滤掉互动小于min_sc和min_uc的用户和物品
+    param {*} self
+    param {*} df
+    return {*}
+    '''
     def filter_triplets(self, df):
         print('Filtering triplets')
         if self.min_sc > 0:
