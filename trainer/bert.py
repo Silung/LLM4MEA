@@ -174,7 +174,7 @@ class BERTTrainer(metaclass=ABCMeta):
 
     def clip_gradients(self, limit=5):
         for p in self.model.parameters():
-            nn.utils.clip_grad_norm_(p, 5)
+            nn.utils.clip_grad_norm_(p, limit)
 
     def _update_meter_set(self, meter_set, metrics):
         for k, v in metrics.items():

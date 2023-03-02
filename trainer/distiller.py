@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
-from torch.autograd.gradcheck import zero_gradients
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -160,7 +159,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         #     print('Dataset already exists. Skip generation')
         #     return
         
-        batch_num = self.args.num_generated_seqs // batch_size
+        batch_num = self.args.num_generated_seqs // batch_size + 1
         print('Generating dataset...')
         for i in tqdm(range(batch_num)):
             seqs = torch.randint(1, self.num_items + 1, (batch_size, 1)).to(self.device)

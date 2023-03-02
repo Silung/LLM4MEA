@@ -85,7 +85,8 @@ def set_template(args):
     args.model_code = model_codes[input('Input model code, b for BERT, s for SASRec and n for NARM: ')]
 
     if torch.cuda.is_available():
-        args.device = 'cuda:' + input('Input GPU ID: ')
+        # args.device = 'cuda:' + input('Input GPU ID: ')
+        args.device = 'cuda'
     else:
         args.device = 'cpu'
     args.optimizer = 'AdamW'
