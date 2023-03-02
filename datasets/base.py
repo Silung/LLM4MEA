@@ -147,7 +147,7 @@ class AbstractDataset(metaclass=ABCMeta):
         return df, umap, smap
 
     '''
-    description: 切分训练集、验证集和测试集
+    description: 将item根据user聚合，按照时间排序形成序列数据，再切分测试集（倒数第一个item）、验证集（倒数第二个item）和训练集（其余）。
     param {*} self
     param {pandas.DataFrame} df 待切分数据
     param {dict[int, int]} user_count 从原始UserID到新生成的Index的映射
@@ -156,9 +156,12 @@ class AbstractDataset(metaclass=ABCMeta):
     def split_df(self, df:pd.DataFrame, user_count:dict[int, int]):
         if self.args.split == 'leave_one_out':
             print('Splitting')
+            # 按user聚合items
             user_group = df.groupby('uid')
+            # 根据timestamp排序
             user2items = user_group.progress_apply(
                 lambda d: list(d.sort_values(by=['timestamp', 'sid'])['sid']))
+            # 划分数据
             train, val, test = {}, {}, {}
             for i in range(user_count):
                 user = i + 1
