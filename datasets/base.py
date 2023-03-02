@@ -67,45 +67,6 @@ class AbstractDataset(metaclass=ABCMeta):
     @abstractmethod
     def maybe_download_raw_dataset(self):
         pass
-        # folder_path = self._get_rawdata_folder_path()
-        # if folder_path.is_dir() and\
-        #    all(folder_path.joinpath(filename).is_file() for filename in self.all_raw_file_names()):
-        #     print('Raw data already exists. Skip downloading')
-        #     return
-        # print("Raw file doesn't exist. Downloading...")
-        # if self.is_zipfile():
-        #     tmproot = Path(tempfile.mkdtemp())
-        #     tmpzip = tmproot.joinpath('file.zip')
-        #     tmpfolder = tmproot.joinpath('folder')
-        #     download(self.url(), tmpzip)
-        #     unzip(tmpzip, tmpfolder)
-        #     if self.zip_file_content_is_folder():
-        #         tmpfolder = tmpfolder.joinpath(os.listdir(tmpfolder)[0])
-        #     shutil.move(tmpfolder, folder_path)
-        #     shutil.rmtree(tmproot)
-        #     print()
-        # elif self.is_7zfile():
-        #     download(self.url(), 'file.7z')
-        #     unzip7z('file.7z')
-        #     os.remove('file.7z')
-        #     os.mkdir(folder_path)
-        #     for item in self.all_raw_file_names():
-        #         shutil.move(item, folder_path.joinpath(item))
-        #     print()
-        # elif self.code() == 'beauty':
-        #     download(self.url(), 'file.csv')
-        #     os.mkdir(folder_path)
-        #     shutil.move('file.csv', folder_path.joinpath(self.code() + '.csv'))
-        #     print()
-        # elif self.code() == 'steam':
-        #     download(self.url(), 'file.gz')
-        #     with gzip.open('file.gz', 'rb') as f_in:
-        #         with open('file.json', 'wb') as f_out:
-        #             shutil.copyfileobj(f_in, f_out)
-        #     os.remove('file.gz')
-        #     os.mkdir(folder_path)
-        #     shutil.move('file.json', folder_path.joinpath(self.code() + '.json'))
-        #     print()
 
     def load_dataset(self):
         self.preprocess()
@@ -170,7 +131,8 @@ class AbstractDataset(metaclass=ABCMeta):
             return train, val, test
         else:
             raise NotImplementedError
-
+    
+    # 一些路径操作
     def _get_rawdata_root_path(self):
         return Path(RAW_DATASET_ROOT_FOLDER)
 
