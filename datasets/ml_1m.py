@@ -1,3 +1,13 @@
+'''
+Author: silung zhaoshilong0108@126.com
+Date: 2023-03-02 12:42:54
+LastEditors: silung zhaoshilong0108@126.com
+LastEditTime: 2023-03-02 15:15:32
+FilePath: \RecSys-Extraction-Attack\datasets\ml_1m.py
+Description: 
+
+Copyright (c) 2023 by silung, All Rights Reserved. 
+'''
 from .base import AbstractDataset
 from .utils import *
 
@@ -27,6 +37,9 @@ class ML1MDataset(AbstractDataset):
     def zip_file_content_is_folder(cls):
         return True
 
+    '''
+    description: 下载数据文件内的文件名
+    '''
     @classmethod
     def all_raw_file_names(cls):
         return ['README',
@@ -42,13 +55,21 @@ class ML1MDataset(AbstractDataset):
     def is_7zfile(cls):
         return False
 
+    '''
+    description: 下载数据，已有数据则跳过
+    param {*} self
+    return {None} 
+    '''
     def maybe_download_raw_dataset(self):
         folder_path = self._get_rawdata_folder_path()
+        
+        # 检查文件是否已经下载
         if folder_path.is_dir() and\
            all(folder_path.joinpath(filename).is_file() for filename in self.all_raw_file_names()):
             print('Raw data already exists. Skip downloading')
             return
         
+        # 下载文件
         print("Raw file doesn't exist. Downloading...")
         tmproot = Path(tempfile.mkdtemp())
         tmpzip = tmproot.joinpath('file.zip')
@@ -81,6 +102,11 @@ class ML1MDataset(AbstractDataset):
         with dataset_path.open('wb') as f:
             pickle.dump(dataset, f)
 
+    '''
+    description: 加载movielens-1m数据中的ratings.dat文件
+    param {*} self
+    return {pandas.Dataframe}
+    '''
     def load_ratings_df(self):
         folder_path = self._get_rawdata_folder_path()
         file_path = folder_path.joinpath('ratings.dat')

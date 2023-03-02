@@ -116,10 +116,10 @@ class AbstractDataset(metaclass=ABCMeta):
     '''
     description: 过滤掉互动小于min_sc和min_uc的用户和物品
     param {*} self
-    param {*} df
+    param {pd} df
     return {*}
     '''
-    def filter_triplets(self, df):
+    def filter_triplets(self, df:pd.DataFrame) -> pd.DataFrame:
         print('Filtering triplets')
         if self.min_sc > 0:
             item_sizes = df.groupby('sid').size()
@@ -132,7 +132,13 @@ class AbstractDataset(metaclass=ABCMeta):
             df = df[df['uid'].isin(good_users)]
         return df
 
-    def densify_index(self, df):
+    '''
+    description: 从1开始重新生成User和Item的Index
+    param {*} self
+    param {pd} df
+    return {tuple}
+    '''
+    def densify_index(self, df:pd.DataFrame) -> tuple[pd.DataFrame, dict[int, int], dict[int, int]]:
         print('Densifying index')
         umap = {u: i for i, u in enumerate(set(df['uid']), start=1)}
         smap = {s: i for i, s in enumerate(set(df['sid']), start=1)}
@@ -140,7 +146,14 @@ class AbstractDataset(metaclass=ABCMeta):
         df['sid'] = df['sid'].map(smap)
         return df, umap, smap
 
-    def split_df(self, df, user_count):
+    '''
+    description: 切分训练集、验证集和测试集
+    param {*} self
+    param {pandas.DataFrame} df 待切分数据
+    param {dict[int, int]} user_count 从原始UserID到新生成的Index的映射
+    return {*}
+    '''
+    def split_df(self, df:pd.DataFrame, user_count:dict[int, int]):
         if self.args.split == 'leave_one_out':
             print('Splitting')
             user_group = df.groupby('uid')
