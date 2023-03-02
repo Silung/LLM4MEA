@@ -25,6 +25,7 @@ class BERTDataloader():
         self.mask_prob = args.bert_mask_prob
         self.max_predictions = args.bert_max_predictions
         self.sliding_size = args.sliding_window_size
+        # MASK_TOKEN 用最后一个itemID + 1
         self.CLOZE_MASK_TOKEN = self.item_count + 1
 
         val_negative_sampler = negative_sampler_factory(args.test_negative_sampler_code,
@@ -83,7 +84,9 @@ class BERTDataloader():
             dataset = BERTTestDataset(self.train, self.val, self.test, self.max_len, self.CLOZE_MASK_TOKEN, self.test_negative_samples)
         return dataset
 
-
+'''
+description: Bert4Rec模型训练时的DataLoader
+'''
 class BERTTrainDataset(data_utils.Dataset):
     def __init__(self, u2seq, max_len, mask_prob, max_predictions, sliding_size, mask_token, num_items, rng):
         # self.u2seq = u2seq
@@ -98,21 +101,22 @@ class BERTTrainDataset(data_utils.Dataset):
         
         assert self.sliding_step > 0
         self.all_seqs = []
+        # u2seq是整理后的训练数据 u2seq = {'userId':[items list], ...}
         for u in sorted(u2seq.keys()):
             seq = u2seq[u]
+            # 序列长度较小，直接加到列表中
             if len(seq) < self.max_len + self.sliding_step:
                 self.all_seqs.append(seq)
+            # 序列长度超过限制，采样多个列表拼接到all_seqs中，
+            # 比如['1', '2', '3', '4', '5', '6']采样出[['4', '5', '6'], ['3', '4', '5'], ['2', '3', '4'], ['1', '2', '3']]
             else:
                 start_idx = range(len(seq) - max_len, -1, -self.sliding_step)
                 self.all_seqs = self.all_seqs + [seq[i:i + max_len] for i in start_idx]
 
     def __len__(self):
         return len(self.all_seqs)
-        # return len(self.users)
 
     def __getitem__(self, index):
-        # user = self.users[index]
-        # seq = self._getseq(user)
         seq = self.all_seqs[index]
 
         tokens = []
@@ -127,6 +131,7 @@ class BERTTrainDataset(data_utils.Dataset):
             
             temp_mask_prob = self.mask_prob
             if i == (len(seq) - 1):
+                # 概率增加了
                 temp_mask_prob += 0.1 * (1 - self.mask_prob)
 
             prob = self.rng.random()
