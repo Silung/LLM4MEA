@@ -18,7 +18,11 @@ class GamesDataset(AbstractDataset):
     @classmethod
     def code(cls):
         return 'games'
-
+ 
+    '''
+    description: 数据集下载链接
+    return {str}
+    '''
     @classmethod
     def url(cls):
         return 'http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/ratings_Video_Games.csv'
@@ -27,6 +31,9 @@ class GamesDataset(AbstractDataset):
     def zip_file_content_is_folder(cls):
         return True
 
+    '''
+    description: 下载数据文件内的文件列表
+    '''
     @classmethod
     def all_raw_file_names(cls):
         return ['games.csv']
@@ -39,6 +46,11 @@ class GamesDataset(AbstractDataset):
     def is_7zfile(cls):
         return False
 
+    '''
+    description: 下载数据，已有数据则跳过
+    param {*} self
+    return {None} 
+    '''
     def maybe_download_raw_dataset(self):
         folder_path = self._get_rawdata_folder_path()
         if folder_path.is_dir() and\
@@ -52,6 +64,11 @@ class GamesDataset(AbstractDataset):
         shutil.move('file.csv', folder_path.joinpath(self.code() + '.csv'))
         print()
 
+    '''
+    description: 下载原始数据，去除互动较少的user & item，重新生成Index并划分训练集、验证集和测试集，最后将数据和映射关系保存到字典中序列化
+    param {*} self
+    return {None}
+    '''
     def preprocess(self):
         dataset_path = self._get_preprocessed_dataset_path()
         if dataset_path.is_file():
@@ -72,7 +89,12 @@ class GamesDataset(AbstractDataset):
         with dataset_path.open('wb') as f:
             pickle.dump(dataset, f)
 
-    def load_ratings_df(self):
+    '''
+    description: 加载steam数据中的文件，生成user-item-time关系表
+    param {*} self
+    return {pandas.Dataframe}
+    '''
+    def load_ratings_df(self) -> pd.DataFrame:
         folder_path = self._get_rawdata_folder_path()
         file_path = folder_path.joinpath('games.csv')
         df = pd.read_csv(file_path, header=None)

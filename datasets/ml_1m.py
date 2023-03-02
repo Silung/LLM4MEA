@@ -1,13 +1,3 @@
-'''
-Author: silung zhaoshilong0108@126.com
-Date: 2023-03-02 12:42:54
-LastEditors: silung zhaoshilong0108@126.com
-LastEditTime: 2023-03-02 15:15:32
-FilePath: \RecSys-Extraction-Attack\datasets\ml_1m.py
-Description: 
-
-Copyright (c) 2023 by silung, All Rights Reserved. 
-'''
 from .base import AbstractDataset
 from .utils import *
 
@@ -29,6 +19,10 @@ class ML1MDataset(AbstractDataset):
     def code(cls):
         return 'ml-1m'
 
+    '''
+    description: 数据集下载链接
+    return {str}
+    '''
     @classmethod
     def url(cls):
         return 'http://files.grouplens.org/datasets/movielens/ml-1m.zip'
@@ -38,7 +32,7 @@ class ML1MDataset(AbstractDataset):
         return True
 
     '''
-    description: 下载数据文件内的文件名
+    description: 下载数据文件内的文件列表
     '''
     @classmethod
     def all_raw_file_names(cls):
@@ -82,6 +76,11 @@ class ML1MDataset(AbstractDataset):
         shutil.rmtree(tmproot)
         print()
 
+    '''
+    description: 下载原始数据，去除互动较少的user & item，重新生成Index并划分训练集、验证集和测试集，最后将数据和映射关系保存到字典中序列化
+    param {*} self
+    return {None}
+    '''
     def preprocess(self):
         dataset_path = self._get_preprocessed_dataset_path()
         if dataset_path.is_file():
@@ -103,11 +102,11 @@ class ML1MDataset(AbstractDataset):
             pickle.dump(dataset, f)
 
     '''
-    description: 加载movielens-1m数据中的ratings.dat文件
+    description: 加载movielens-1m数据中的ratings.dat文件，生成user-item-time关系表
     param {*} self
     return {pandas.Dataframe}
     '''
-    def load_ratings_df(self):
+    def load_ratings_df(self) -> pd.DataFrame:
         folder_path = self._get_rawdata_folder_path()
         file_path = folder_path.joinpath('ratings.dat')
         df = pd.read_csv(file_path, sep='::', header=None)
