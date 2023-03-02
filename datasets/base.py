@@ -61,7 +61,7 @@ class AbstractDataset(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def load_ratings_df(self):
+    def load_ratings_df(self) -> pd.DataFrame:
         pass
 
     @abstractmethod

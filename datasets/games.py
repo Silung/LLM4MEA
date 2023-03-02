@@ -90,7 +90,7 @@ class GamesDataset(AbstractDataset):
             pickle.dump(dataset, f)
 
     '''
-    description: 加载steam数据中的文件，生成user-item-time关系表
+    description: 生成user-item-rating-time关系表
     param {*} self
     return {pandas.Dataframe}
     '''

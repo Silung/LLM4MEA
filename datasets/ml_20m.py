@@ -102,7 +102,7 @@ class ML20MDataset(AbstractDataset):
             pickle.dump(dataset, f)
 
     '''
-    description: 加载movielens-20m数据中的ratings.dat文件，生成user-item-time关系表
+    description: 加载movielens-20m数据中的ratings.dat文件，生成user-item-rating-time关系表
     param {*} self
     return {pandas.Dataframe}
     '''
