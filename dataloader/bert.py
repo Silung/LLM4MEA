@@ -131,7 +131,7 @@ class BERTTrainDataset(data_utils.Dataset):
             
             temp_mask_prob = self.mask_prob
             if i == (len(seq) - 1):
-                # 概率增加了
+                # 概率增加了？？？
                 temp_mask_prob += 0.1 * (1 - self.mask_prob)
 
             prob = self.rng.random()
@@ -141,8 +141,10 @@ class BERTTrainDataset(data_utils.Dataset):
                 if prob < 0.8:
                     tokens.append(self.mask_token)
                 elif prob < 0.9:
+                    # ？？？
                     tokens.append(self.rng.randint(1, self.num_items))
                 else:
+                    # ？？？
                     tokens.append(s)
 
                 labels.append(s)
@@ -155,6 +157,7 @@ class BERTTrainDataset(data_utils.Dataset):
 
         mask_len = self.max_len - len(tokens)
 
+        # Padding
         tokens = [0] * mask_len + tokens
         labels = [0] * mask_len + labels
 
