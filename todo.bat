@@ -1,7 +1,7 @@
 @REM dataset 'ml-1m', 'ml-20m', 'steam', 'games', 'beauty', 'beauty_dense', 'yoochoose'
 @REM model None, 'bert', 'sas', 'narm'
 
-@REM conda activate cuda
+conda activate cuda
 @REM bert
 python train.py --dataset_code steam --model_code bert
 python train.py --dataset_code yoochoose --model_code bert
