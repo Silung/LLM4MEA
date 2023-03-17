@@ -20,7 +20,8 @@ def set_template(args):
     args.min_sc = 5
     args.split = 'leave_one_out'
     dataset_code = {'1': 'ml-1m', '20': 'ml-20m', 'b': 'beauty', 'bd': 'beauty_dense' , 'g': 'games', 's': 'steam', 'y': 'yoochoose'}
-    args.dataset_code = dataset_code[input('Input 1 / 20 for movielens, b for beauty, bd for dense beauty, g for games, s for steam and y for yoochoose: ')]
+    if args.dataset_code is None:
+        args.dataset_code = dataset_code[input('Input 1 / 20 for movielens, b for beauty, bd for dense beauty, g for games, s for steam and y for yoochoose: ')]
     if args.dataset_code == 'ml-1m':
         args.sliding_window_size = 0.5
         args.bert_hidden_units = 64
@@ -82,7 +83,8 @@ def set_template(args):
     args.test_negative_sampling_seed = 98765
 
     model_codes = {'b': 'bert', 's':'sas', 'n':'narm'}
-    args.model_code = model_codes[input('Input model code, b for BERT, s for SASRec and n for NARM: ')]
+    if args.model_code is None:
+        args.model_code = model_codes[input('Input model code, b for BERT, s for SASRec and n for NARM: ')]
 
     if torch.cuda.is_available():
         # args.device = 'cuda:' + input('Input GPU ID: ')
@@ -112,7 +114,7 @@ parser = argparse.ArgumentParser()
 ################
 # Dataset
 ################
-parser.add_argument('--dataset_code', type=str, default='ml-1m', choices=DATASETS.keys())
+parser.add_argument('--dataset_code', type=str, default=None, choices=list(DATASETS.keys()) + [None])
 parser.add_argument('--min_rating', type=int, default=0)
 parser.add_argument('--min_uc', type=int, default=5)
 parser.add_argument('--min_sc', type=int, default=5)
@@ -166,7 +168,7 @@ parser.add_argument('--best_metric', type=str, default='NDCG@10')
 ################
 # Model
 ################
-parser.add_argument('--model_code', type=str, default='bert', choices=['bert', 'sas', 'narm'])
+parser.add_argument('--model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm'])
 # BERT specs, used for SASRec and NARM as well #
 parser.add_argument('--bert_max_len', type=int, default=None)
 parser.add_argument('--bert_hidden_units', type=int, default=64)
