@@ -114,7 +114,7 @@ class AbstractDataset(metaclass=ABCMeta):
     param {dict[int, int]} user_count 从原始UserID到新生成的Index的映射
     return {*}
     '''
-    def split_df(self, df:pd.DataFrame, user_count:dict[int, int]):
+    def split_df(self, df:pd.DataFrame, user_count):
         if self.args.split == 'leave_one_out':
             print('Splitting')
             # 按user聚合items
