@@ -3,7 +3,7 @@
 
 @REM conda activate cuda
 @REM bert
-@REM 太慢了
+@REM On Google Colab ing
 @REM python train.py --dataset_code steam --model_code bert
 @REM python train.py --dataset_code yoochoose --model_code bert
 
