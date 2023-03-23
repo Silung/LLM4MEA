@@ -8,10 +8,13 @@
 @REM python train.py --dataset_code yoochoose --model_code bert
 
 @REM sas
-@REM On Google Colab
+@REM On Google Colab Done!
 @REM python train.py --dataset_code ml-1m --model_code sas
-python train.py --dataset_code ml-20m --model_code sas
-python train.py --dataset_code steam --model_code sas
+@REM 太慢了
+@REM python train.py --dataset_code ml-20m --model_code sas
+@REM 太慢了
+@REM python train.py --dataset_code steam --model_code sas
+@REM On Google Colab Runing...
 python train.py --dataset_code games --model_code sas
 python train.py --dataset_code beauty --model_code sas
 python train.py --dataset_code beauty_dense --model_code sas
