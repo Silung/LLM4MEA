@@ -14,11 +14,12 @@
 @REM python train.py --dataset_code ml-20m --model_code sas
 @REM 太慢了
 @REM python train.py --dataset_code steam --model_code sas
-@REM On Google Colab Runing...
+@REM On Google Colab Running...
 python train.py --dataset_code games --model_code sas
-@REM On Kaggle Runing...
+@REM On Kaggle Running...
 python train.py --dataset_code beauty --model_code sas
 python train.py --dataset_code beauty_dense --model_code sas
+@REM On WK Running
 python train.py --dataset_code yoochoose --model_code sas
 
 @REM narm
