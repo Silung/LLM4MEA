@@ -23,20 +23,22 @@ def distill(args, bb_model_root=None, export_root=None, resume=False):
         model = NARM(args)
     
     model_codes = {'b': 'bert', 's':'sas', 'n':'narm'}
-    bb_model_code = model_codes[input('Input black box model code, b for BERT, s for SASRec and n for NARM: ')]
-    args.num_generated_seqs = int(input('Input integer number of seqs budget: '))
+    if args.bb_model_code is None:
+        args.bb_model_code = model_codes[input('Input black box model code, b for BERT, s for SASRec and n for NARM: ')]
+    if args.num_generated_seqs is None:
+        args.num_generated_seqs = int(input('Input integer number of seqs budget: '))
 
-    if bb_model_code == 'bert':
+    if args.bb_model_code == 'bert':
         bb_model = BERT(args)
-    elif bb_model_code == 'sas':
+    elif args.bb_model_code == 'sas':
         bb_model = SASRec(args)
-    elif bb_model_code == 'narm':
+    elif args.bb_model_code == 'narm':
         bb_model = NARM(args)
     
     if bb_model_root == None:
-        bb_model_root = 'experiments/' + bb_model_code + '/' + args.dataset_code
+        bb_model_root = 'experiments/' + args.bb_model_code + '/' + args.dataset_code
     if export_root == None:
-        folder_name = bb_model_code + '2' + args.model_code + '_autoregressive' + str(args.num_generated_seqs)
+        folder_name = args.bb_model_code + '2' + args.model_code + '_autoregressive' + str(args.num_generated_seqs)
         export_root = 'experiments/distillation_rank/' + folder_name + '/' + args.dataset_code
 
     bb_model.load_state_dict(torch.load(os.path.join(bb_model_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
