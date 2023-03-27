@@ -169,6 +169,7 @@ parser.add_argument('--best_metric', type=str, default='NDCG@10')
 # Model
 ################
 parser.add_argument('--model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm'])
+parser.add_argument('--bb_model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm'])
 # BERT specs, used for SASRec and NARM as well #
 parser.add_argument('--bert_max_len', type=int, default=None)
 parser.add_argument('--bert_hidden_units', type=int, default=64)
