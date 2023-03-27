@@ -47,7 +47,7 @@ def distill(args, bb_model_root=None, export_root=None, resume=False):
             model.load_state_dict(torch.load(os.path.join(export_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
         except FileNotFoundError:
             print('Failed to load old model, continue training new model...')
-    trainer = NoDataRankDistillationTrainer(args, args.model_code, model, bb_model, test_loader, export_root)
+    trainer = NoDataRankDistillationTrainer(args, args.model_code, model, bb_model, test_loader, export_root, args.loss)
 
     trainer.train_autoregressive()
 
