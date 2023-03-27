@@ -105,7 +105,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             # assume candidates are in descending order w.r.t. true label
             neg_logits = torch.gather(logits, -1, neg_samples)
             logits = torch.gather(logits, -1, candidates)
-            p = random.randint(1, (len(logits_1) + 1)//2)
+            p = random.randint(1, (logits.size()[1] + 1)//2)
             logits_1 = logits[:, :-p].reshape(-1)
             logits_2 = logits[:, p:].reshape(-1)
             loss = self.loss_func_1(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
