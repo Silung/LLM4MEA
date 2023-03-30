@@ -3,13 +3,14 @@
 
 @REM conda activate cuda
 @REM bert
-@REM On Google Colab ing
+@REM 太慢了
 @REM python train.py --dataset_code steam --model_code bert
 @REM python train.py --dataset_code yoochoose --model_code bert
 
 @REM sas
 @REM On Google Colab 完成！
 @REM python train.py --dataset_code ml-1m --model_code sas
+@REM On Google Colab ...
 python train.py --dataset_code ml-20m --model_code sas
 python train.py --dataset_code steam --model_code sas
 python train.py --dataset_code games --model_code sas
