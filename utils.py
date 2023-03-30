@@ -164,11 +164,14 @@ parser.add_argument('--log_period_as_iter', type=int, default=12800)
 # evaluation #
 parser.add_argument('--metric_ks', nargs='+', type=int, default=[1, 5, 10, 20])
 parser.add_argument('--best_metric', type=str, default='NDCG@10')
+# loss #
+parser.add_argument('--loss', type=str, default='ranking', choices=['ranking', 'kl', 'kl+ct', 'myranking'])
 
 ################
 # Model
 ################
 parser.add_argument('--model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm'])
+parser.add_argument('--bb_model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm'])
 # BERT specs, used for SASRec and NARM as well #
 parser.add_argument('--bert_max_len', type=int, default=None)
 parser.add_argument('--bert_hidden_units', type=int, default=64)

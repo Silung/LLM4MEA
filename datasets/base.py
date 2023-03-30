@@ -99,7 +99,7 @@ class AbstractDataset(metaclass=ABCMeta):
     param {pd} df
     return {tuple}
     '''
-    def densify_index(self, df:pd.DataFrame) -> tuple[pd.DataFrame, dict[int, int], dict[int, int]]:
+    def densify_index(self, df:pd.DataFrame):
         print('Densifying index')
         umap = {u: i for i, u in enumerate(set(df['uid']), start=1)}
         smap = {s: i for i, s in enumerate(set(df['sid']), start=1)}
@@ -114,7 +114,7 @@ class AbstractDataset(metaclass=ABCMeta):
     param {dict[int, int]} user_count 从原始UserID到新生成的Index的映射
     return {*}
     '''
-    def split_df(self, df:pd.DataFrame, user_count:dict[int, int]):
+    def split_df(self, df:pd.DataFrame, user_count):
         if self.args.split == 'leave_one_out':
             print('Splitting')
             # 按user聚合items

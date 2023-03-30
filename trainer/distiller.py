@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 import json
 import faiss
+import random
 import numpy as np
 from abc import *
 from pathlib import Path
@@ -65,6 +66,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         elif self.loss == 'ranking':
             self.loss_func_1 = nn.MarginRankingLoss(margin=self.margin_topk)
             self.loss_func_2 = nn.MarginRankingLoss(margin=self.margin_neg)
+        elif self.loss == 'myranking':
+            self.loss_func_1 = nn.MarginRankingLoss(margin=self.margin_topk)
+            self.loss_func_2 = nn.MarginRankingLoss(margin=self.margin_neg)
         elif self.loss == 'kl+ct':
             self.loss_func_1 = nn.KLDivLoss(reduction='batchmean')
             self.loss_func_2 = nn.CrossEntropyLoss(ignore_index=0)
@@ -91,6 +95,19 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             logits = torch.gather(logits, -1, candidates)
             logits_1 = logits[:, :-1].reshape(-1)
             logits_2 = logits[:, 1:].reshape(-1)
+            loss = self.loss_func_1(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
+            loss += self.loss_func_2(logits, neg_logits, torch.ones(logits.shape).to(self.device))
+        
+        elif self.loss == 'myranking':
+            weight = torch.ones_like(logits).to(self.device)
+            weight[torch.arange(weight.size(0)).unsqueeze(1), candidates] = 0
+            neg_samples = torch.distributions.Categorical(F.softmax(weight, -1)).sample_n(candidates.size(-1)).permute(1, 0)
+            # assume candidates are in descending order w.r.t. true label
+            neg_logits = torch.gather(logits, -1, neg_samples)
+            logits = torch.gather(logits, -1, candidates)
+            p = random.randint(1, (logits.size()[1] + 1)//2)
+            logits_1 = logits[:, :-p].reshape(-1)
+            logits_2 = logits[:, p:].reshape(-1)
             loss = self.loss_func_1(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
             loss += self.loss_func_2(logits, neg_logits, torch.ones(logits.shape).to(self.device))
             
