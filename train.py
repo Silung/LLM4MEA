@@ -7,6 +7,11 @@ from dataloader import *
 from trainer import *
 from utils import *
 
+try:
+    import torch_directml
+except:
+    print("Direct-ml not available")
+
 
 def train(args, export_root=None, resume=False):
     args.lr = 0.001
@@ -47,5 +52,6 @@ if __name__ == "__main__":
     # when use k-core beauty and k is not 5 (beauty-dense)
     # args.min_uc = k
     # args.min_sc = k
-
+    if args.device =='dml' and torch_directml.is_available():
+        args.device = torch_directml.device(torch_directml.default_device())
     train(args, resume=True)
