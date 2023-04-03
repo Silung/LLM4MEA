@@ -16,9 +16,9 @@ class PositionalEmbedding(nn.Module):
         self.pe = nn.Embedding(max_len+1, d_model)
 
     def forward(self, x):
-        pose = (x > 0) * (x > 0).sum(dim=-1).unsqueeze(1).repeat(1, x.size(-1))
+        pose = (x > 0).long() * (x > 0).sum(dim=-1).unsqueeze(1).repeat(1, x.size(-1))
         pose += torch.arange(start=-(x.size(1)-1), end=1, step=1, device=x.device)
-        pose = pose * (x > 0)
+        pose = pose * (x > 0).long()
 
         return self.pe(pose)
 

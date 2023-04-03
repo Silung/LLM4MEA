@@ -12,6 +12,11 @@ import torch
 from pathlib import Path
 from collections import defaultdict
 
+try:
+    import torch_directml
+except:
+    print("Direct-ml not available")
+
 
 def attack(args, attack_item_num=2, bb_model_root=None):
     fix_random_seed_as(args.model_init_seed)
@@ -126,7 +131,8 @@ if __name__ == "__main__":
     # when use k-core beauty and k is not 5 (beauty-dense)
     # args.min_uc = k
     # args.min_sc = k
-
+    if args.device =='dml' and torch_directml.is_available():
+        args.device = torch_directml.device(torch_directml.default_device())
     if args.dataset_code == 'ml-1m':
         attack(args=args, attack_item_num=10)
     else:

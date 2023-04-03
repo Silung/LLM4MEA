@@ -89,8 +89,6 @@ def set_template(args):
     if torch.cuda.is_available():
         # args.device = 'cuda:' + input('Input GPU ID: ')
         args.device = 'cuda'
-    else:
-        args.device = 'cpu'
     args.optimizer = 'AdamW'
     args.lr = 0.001
     args.weight_decay = 0.01
@@ -144,7 +142,7 @@ parser.add_argument('--test_negative_sampling_seed', type=int, default=0)
 # Trainer
 ################
 # device #
-parser.add_argument('--device', type=str, default='cpu', choices=['cpu', 'cuda'])
+parser.add_argument('--device', type=str, default='cpu', choices=['cpu', 'cuda', 'dml'])
 parser.add_argument('--num_gpu', type=int, default=1)
 # optimizer & lr#
 parser.add_argument('--optimizer', type=str, default='AdamW', choices=['AdamW', 'Adam', 'SGD'])
