@@ -1,3 +1,8 @@
+seqs, candidates, labels = batch
+seqs: 某个用户的浏览序列
+candidates: test data 与负采样拼接
+labels: 与candidates shape相同，test data为1，负采样为0
+
 # Introduction
 
 The RecSys-Model-Extraction-Attack repository is the PyTorch Implementation of RecSys 2021 Paper [Black-Box Attacks on Sequential Recommenders via Data-Free Model Extraction](https://arxiv.org/abs/2109.01165)

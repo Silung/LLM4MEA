@@ -219,7 +219,7 @@ class BERTTestDataset(data_utils.Dataset):
     def __getitem__(self, index):
         user = self.users[index]
         seq = self.u2seq[user] + self.u2val[user]  # append validation item after train seq
-        answer = self.u2answer[user]
+        answer = self.u2answer[user] # test data
         negs = self.negative_samples[user]
 
         candidates = answer + negs

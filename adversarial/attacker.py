@@ -68,11 +68,13 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
                     seqs = self.post2pre_padding(seqs)
                 
                 perturbed_seqs = seqs.clone()
+                # 在seq后添加num_attack个target item
                 append_items = torch.tensor([target]*(perturbed_seqs.size(0)*num_attack)).reshape(-1, num_attack)
                 perturbed_seqs = torch.cat((perturbed_seqs, torch.tensor(append_items).to(self.device)), 1)
 
                 perturbed_seqs = perturbed_seqs[:, -self.max_len:]
                 if isinstance(self.wb_model, BERT):
+                    # MASK最后一个Item
                     mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * perturbed_seqs.size(0)).to(self.device)
                     perturbed_seqs[:, :-1] = perturbed_seqs[:, 1:]
                     perturbed_seqs[:, -1] = mask_items
@@ -94,9 +96,10 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
             elif isinstance(self.wb_model, NARM):
                 wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, lengths, mask)
 
+            # 与预测最后一个Item为target的情况计算Loss
             loss = self.adv_ce(wb_scores, torch.tensor([target] * perturbed_seqs.size(0)).to(self.device))
             self.wb_model.zero_grad()
-            loss.backward()
+            loss.backward() # 优化 perturbed_seqs 通过白盒的embedding 和 白盒模型参数
             wb_embedding_grad = wb_embedding.grad.data
 
             self.wb_model.eval()
@@ -116,9 +119,15 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
                     current_embedding_grad = wb_embedding_grad[row_indices, col_indices]
                     all_embeddings = self.item_embeddings.unsqueeze(1).repeat_interleave(current_embedding.size(0), 1)
                     cos = nn.CosineSimilarity(dim=-1, eps=1e-6)
+                    # compute cosine similarity scores S between ˜z − ϵsign(∇) and fw,e (i) ∀i ∈ I;
+                    # select n candidates C with highest S scores, exclude t if repeated;
+                    # 因为item domain是离散的,不能直接用˜z − ϵsign(∇)作为对抗样本,需要找最相似的
+                    # ˜z − ϵsign(∇) 想让输出向target靠拢
                     multipication_results = torch.t(cos(current_embedding-current_embedding_grad.sign(), all_embeddings))
                     _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=True)
 
+                    # 这些项目用白盒模型进行测试，使得得分最高的候选人被保留为对抗项目。
+                    # 是保留白盒测试的结果高的还是相似度最高的????
                     if num == 0:
                         multipication_results[:, target-1] = multipication_results[:, target-1] - 100000000
                         _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=True)
@@ -144,6 +153,7 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
                             logits = F.softmax(self.wb_model(best_seqs, lengths), dim=-1)
                         best_scores = torch.gather(logits, -1, torch.tensor([target] * best_seqs.size(0)).unsqueeze(1).to(self.device)).squeeze()
 
+                    # 尝试candidate中的多个对抗样本,多次找最好的,为在黑盒上测试准备
                     for time in range(repeated_search):
                         temp_seqs = best_seqs.clone().detach()
                         temp_seqs[row_indices, col_indices] = candidate_indicies[:, time] + 1
@@ -160,6 +170,7 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
                         best_scores = best_scores.detach()
                         del temp_scores
             
+            # 在黑盒模型上进行测试
             perturbed_seqs = best_seqs.detach()
             if isinstance(self.wb_model, BERT) and isinstance(self.bb_model, BERT):
                 perturbed_scores = self.bb_model(perturbed_seqs)[:, -1, :]

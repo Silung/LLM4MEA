@@ -68,6 +68,7 @@ def attack(args, attack_item_num=2, bb_model_root=None):
         for i in seqs:
             item_counter[i] += 1
 
+    # [(item count, item), ...]
     item_popularity = []
     for i in item_counter.keys():
         item_popularity.append((item_counter[i], i))
@@ -134,6 +135,7 @@ if __name__ == "__main__":
     if args.device =='dml' and torch_directml.is_available():
         args.device = torch_directml.device(torch_directml.default_device())
     if args.dataset_code == 'ml-1m':
+        # attack_item_num: 在seq后连续添加target item的数量
         attack(args=args, attack_item_num=10)
     else:
         attack(args=args, attack_item_num=2)

@@ -75,7 +75,9 @@ def retrain(args, bb_model_root=None):
     wb_model.load_state_dict(torch.load(os.path.join(wb_model_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
    
     step = len(item_popularity) // 25
+    # 出现次数Top5%的items
     popular_items = [item_popularity[i][1] for i in range(int(0.05*len(item_popularity)))]
+    # targets不一定popular
     attack_ranks = list(range(0, len(item_popularity), step))[:25]
     targets = [item_popularity[i][1] for i in attack_ranks]
 
