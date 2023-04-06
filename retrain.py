@@ -80,7 +80,6 @@ def retrain(args, bb_model_root=None):
     # targets不一定popular
     attack_ranks = list(range(0, len(item_popularity), step))[:25]
     targets = [item_popularity[i][1] for i in attack_ranks]
-
     bb_poisoned_metrics = {}
     all_ratios = [0.01]
     for ratio in all_ratios:        

@@ -99,7 +99,7 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
             # 与预测最后一个Item为target的情况计算Loss
             loss = self.adv_ce(wb_scores, torch.tensor([target] * perturbed_seqs.size(0)).to(self.device))
             self.wb_model.zero_grad()
-            loss.backward() # 优化 perturbed_seqs 通过白盒的embedding 和 白盒模型参数
+            loss.backward() # 这里没有进行参数更改
             wb_embedding_grad = wb_embedding.grad.data
 
             self.wb_model.eval()
