@@ -38,6 +38,7 @@ def ndcg(scores, labels, k):
 
 
 def recalls_and_ndcgs_for_ks(scores, labels, ks):
+    # 默认ks=[1,5,10]，对应Top1,Top5,Top10列表
     metrics = {}
 
     scores = scores
