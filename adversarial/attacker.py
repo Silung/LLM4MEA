@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
-from torch.autograd.gradcheck import zero_gradients
 from tqdm import tqdm
 
 import json
@@ -89,7 +88,7 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
             self.wb_model.train()
             wb_embedding = wb_embedding.detach().clone()
             wb_embedding.requires_grad = True
-            zero_gradients(wb_embedding)
+            wb_embedding.zero_grad()
 
             if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
                 wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, mask)[:, -1, :]
