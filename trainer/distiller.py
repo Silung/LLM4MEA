@@ -12,6 +12,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.tensorboard import SummaryWriter
+from torch.cuda.amp import autocast, GradScaler
 from tqdm import tqdm
 
 import json
@@ -309,8 +310,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         dis_train_loader, dis_val_loader = dis_train_loader_factory(self.args, self.model_code, 'autoregressive')
         print('## Distilling model via autoregressive data... ##')
         self.validate(dis_val_loader, 0, accum_iter)
+        scaler = GradScaler()
         for epoch in range(self.num_epochs):
-            accum_iter = self.train_one_epoch(epoch, accum_iter, dis_train_loader, dis_val_loader, stage=1)
+            accum_iter = self.train_one_epoch(epoch, accum_iter, dis_train_loader, dis_val_loader, scaler, stage=1)
         
         metrics = self.test()
         
@@ -321,7 +323,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
 
         return metrics
 
-    def train_one_epoch(self, epoch, accum_iter, train_loader, val_loader, stage=0):
+    def train_one_epoch(self, epoch, accum_iter, train_loader, val_loader, scaler, stage=0):
         self.model.train()
         self.bb_model.train()
         average_meter_set = AverageMeterSet()
@@ -332,16 +334,26 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             if isinstance(self.model, BERT) or isinstance(self.model, SASRec):
                 seqs, candidates, labels = batch
                 seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
-                loss = self.calculate_loss(seqs, labels, candidates)
+                with autocast():
+                    loss = self.calculate_loss(seqs, labels, candidates)
             elif isinstance(self.model, NARM):
                 seqs, lengths, candidates, labels = batch
                 lengths = lengths.flatten()
                 seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
-                loss = self.calculate_loss(seqs, labels, candidates, lengths=lengths)
+                with autocast():
+                    loss = self.calculate_loss(seqs, labels, candidates, lengths=lengths)
             
-            loss.backward()
-            self.clip_gradients(5)
-            self.optimizer.step()
+            scaler.scale(loss).backward()  #为了梯度放大
+            # 对优化器持有的参数的梯度进行反向缩放
+            # scaler.unscale_(self.optimizer)
+            #scaler.step() 首先把梯度值unscale回来，如果梯度值不是inf或NaN,则调用optimizer.step()来更新权重，否则，忽略step调用，从而保证权重不更新。   
+            # self.clip_gradients(5)
+            scaler.step(self.optimizer)
+            scaler.update()
+
+            # loss.backward()
+            # self.clip_gradients(5)
+            # self.optimizer.step()
             accum_iter += int(seqs.size(0))
             average_meter_set.update('loss', loss.item())
             tqdm_dataloader.set_description(

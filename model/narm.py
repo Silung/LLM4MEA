@@ -80,7 +80,7 @@ class NARMModel(nn.Module):
         state1 = mask.unsqueeze(2).expand_as(state2) * state1
         alpha = self.act(state1 + state2).view(-1, state1.size(-1))
         attn = self.v_vector(alpha).view(mask.size())
-        attn = F.softmax(attn.masked_fill(mask == 0, -1e9), dim=-1)
+        attn = F.softmax(attn.masked_fill(mask == 0, -1e9 if attn.dtype == torch.float32 else -1e4), dim=-1)
         c_local = torch.sum(attn.unsqueeze(2).expand_as(gru_out) * gru_out, 1)
 
         proj = self.proj_dropout(torch.cat([c_global, c_local], 1))
