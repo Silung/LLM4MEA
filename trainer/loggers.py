@@ -51,6 +51,7 @@ class RecentModelLogger(AbstractBaseLogger):
             self.recent_epoch = epoch
             state_dict = kwargs['state_dict']
             state_dict['epoch'] = kwargs['epoch']
+            state_dict['accum_iter'] = kwargs['accum_iter']
             save_state_dict(state_dict, self.checkpoint_path, self.filename)
 
     def complete(self, *args, **kwargs):

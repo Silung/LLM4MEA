@@ -18,7 +18,7 @@ from pathlib import Path
 
 
 class SASTrainer(metaclass=ABCMeta):
-    def __init__(self, args, model, train_loader, val_loader, test_loader, export_root):
+    def __init__(self, args, model, train_loader, val_loader, test_loader, export_root, last_epoch=0, last_accum_iter=0):
         self.args = args
         self.device = args.device
         self.model = model.to(self.device)
@@ -27,6 +27,8 @@ class SASTrainer(metaclass=ABCMeta):
             self.model = nn.DataParallel(self.model)
 
         self.num_epochs = args.num_epochs
+        self.last_epoch = last_epoch
+        self.last_accum_iter = last_accum_iter
         self.metric_ks = args.metric_ks
         self.best_metric = args.best_metric
         self.train_loader = train_loader
@@ -50,9 +52,9 @@ class SASTrainer(metaclass=ABCMeta):
         self.bce = nn.BCEWithLogitsLoss()
 
     def train(self):
-        accum_iter = 0
-        self.validate(0, accum_iter)
-        for epoch in range(self.num_epochs):
+        accum_iter = self.last_accum_iter
+        # self.validate(max(0, self.last_epoch - 1), accum_iter)
+        for epoch in range(self.last_epoch, self.num_epochs):
             accum_iter = self.train_one_epoch(epoch, accum_iter)
             self.validate(epoch, accum_iter)
         self.logger_service.complete({

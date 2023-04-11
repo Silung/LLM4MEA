@@ -1,5 +1,7 @@
 from datasets import DATASETS
 from config import STATE_DICT_KEY
+from config import EPOCH_STATE_DICT_KEY
+from config import ACC_ITER_STATE_DICT_KEY
 import argparse
 import torch
 from model import *
@@ -28,19 +30,25 @@ def train(args, export_root=None, resume=False):
     if export_root == None:
         export_root = 'experiments/' + args.model_code + '/' + args.dataset_code
     
+    start_epoch = 0
+    last_accum_iter = 0
     if resume:
         try: 
-            model.load_state_dict(torch.load(os.path.join(export_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
+            # state_dict = torch.load(os.path.join(export_root, 'models', 'best_acc_model.pth'), map_location='cpu')
+            state_dict = torch.load(os.path.join(export_root, 'models', 'checkpoint-recent.pth'), map_location='cpu')
+            model.load_state_dict(state_dict.get(STATE_DICT_KEY))
+            start_epoch = state_dict.get(EPOCH_STATE_DICT_KEY)
+            last_accum_iter = state_dict.get(ACC_ITER_STATE_DICT_KEY)
         except FileNotFoundError:
             print('Failed to load old model, continue training new model...')
 
     if args.model_code == 'bert':
-        trainer = BERTTrainer(args, model, train_loader, val_loader, test_loader, export_root)
+        trainer = BERTTrainer(args, model, train_loader, val_loader, test_loader, export_root, start_epoch, last_accum_iter)
     if args.model_code == 'sas':
-        trainer = SASTrainer(args, model, train_loader, val_loader, test_loader, export_root)
+        trainer = SASTrainer(args, model, train_loader, val_loader, test_loader, export_root, start_epoch, last_accum_iter)
     elif args.model_code == 'narm':
         args.num_epochs = 100
-        trainer = RNNTrainer(args, model, train_loader, val_loader, test_loader, export_root)
+        trainer = RNNTrainer(args, model, train_loader, val_loader, test_loader, export_root, start_epoch, last_accum_iter)
 
     trainer.train()
     trainer.test()
