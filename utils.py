@@ -71,10 +71,12 @@ def set_template(args):
         args.bert_mask_prob = 0.4
         args.bert_max_predictions = 20
 
-    batch = 128
-    args.train_batch_size = batch
-    args.val_batch_size = batch
-    args.test_batch_size = batch
+    if args.train_batch_size <= 0:
+        args.train_batch_size = args.batch_size
+    if args.val_batch_size <= 0:
+        args.val_batch_size = args.batch_size
+    if args.test_batch_size <= 0:
+        args.test_batch_size = args.batch_size
     args.train_negative_sampler_code = 'random'
     args.train_negative_sample_size = 0
     args.train_negative_sampling_seed = 0
@@ -86,9 +88,12 @@ def set_template(args):
     if args.model_code is None:
         args.model_code = model_codes[input('Input model code, b for BERT, s for SASRec and n for NARM: ')]
 
-    if torch.cuda.is_available():
+    if args.device == 'cuda':
+        if torch.cuda.is_available():
         # args.device = 'cuda:' + input('Input GPU ID: ')
-        args.device = 'cuda'
+            args.device = 'cuda'
+        else:
+            args.device = 'cpu'
     args.optimizer = 'AdamW'
     args.lr = 0.001
     args.weight_decay = 0.01
@@ -97,7 +102,6 @@ def set_template(args):
     args.gamma = 1.
     args.enable_lr_warmup = False
     args.warmup_steps = 100
-    args.num_epochs = 1000
 
     args.metric_ks = [1, 5, 10]
     args.best_metric = 'NDCG@10'
@@ -123,9 +127,10 @@ parser.add_argument('--dataset_split_seed', type=int, default=0)
 # Dataloader
 ################
 parser.add_argument('--dataloader_random_seed', type=float, default=0)
-parser.add_argument('--train_batch_size', type=int, default=64)
-parser.add_argument('--val_batch_size', type=int, default=64)
-parser.add_argument('--test_batch_size', type=int, default=64)
+parser.add_argument('--batch_size', type=int, default=128)
+parser.add_argument('--train_batch_size', type=int, default=-1)
+parser.add_argument('--val_batch_size', type=int, default=-1)
+parser.add_argument('--test_batch_size', type=int, default=-1)
 parser.add_argument('--sliding_window_size', type=float, default=0.5)
 
 ################
@@ -142,7 +147,7 @@ parser.add_argument('--test_negative_sampling_seed', type=int, default=0)
 # Trainer
 ################
 # device #
-parser.add_argument('--device', type=str, default='cpu', choices=['cpu', 'cuda', 'dml'])
+parser.add_argument('--device', type=str, default='cuda', choices=['cpu', 'cuda', 'dml'])
 parser.add_argument('--num_gpu', type=int, default=1)
 # optimizer & lr#
 parser.add_argument('--optimizer', type=str, default='AdamW', choices=['AdamW', 'Adam', 'SGD'])
