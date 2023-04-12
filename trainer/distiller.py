@@ -118,8 +118,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         elif self.loss == 'list':
             logits = torch.gather(logits, -1, candidates)
             logits = logits.view(-1, logits.size(-1))
-            labels = labels.view(-1, labels.size(-1))
-            loss = self.loss_func(logits)
+            loss = self.loss_func(F.softmax(logits/self.tau, dim=-1))
             
         elif self.loss == 'kl+ct':
             logits = torch.gather(logits, -1, candidates)
