@@ -23,7 +23,7 @@ from pathlib import Path
 
 
 class NoDataRankDistillationTrainer(metaclass=ABCMeta):
-    def __init__(self, args, model_code, model, bb_model, test_loader, export_root, loss='ranking', tau=1., margin_topk=0.5, margin_neg=0.5):
+    def __init__(self, args, model_code, model, bb_model, test_loader, export_root, loss='ranking', last_epoch=0, last_accum_iter=0, tau=1., margin_topk=0.5, margin_neg=0.5):
         self.args = args
         self.device = args.device
         self.num_items = args.num_items
@@ -38,6 +38,8 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         self.bb_model = bb_model.to(self.device)
 
         self.num_epochs = args.num_epochs
+        self.last_epoch = last_epoch
+        self.last_accum_iter = last_accum_iter
         self.metric_ks = args.metric_ks
         self.best_metric = args.best_metric
         self.export_root = export_root
@@ -309,15 +311,15 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         dataset.save_dataset(batch_tokens.tolist(), batch_logits.tolist(), batch_candidates.tolist())
 
     def train_autoregressive(self):        
-        accum_iter = 0
+        accum_iter = self.last_accum_iter
         self.writer, self.train_loggers, self.val_loggers = self._create_loggers()
         self.logger_service = LoggerService(
             self.train_loggers, self.val_loggers)
         self.generate_autoregressive_data()
         dis_train_loader, dis_val_loader = dis_train_loader_factory(self.args, self.model_code, 'autoregressive')
         print('## Distilling model via autoregressive data... ##')
-        self.validate(dis_val_loader, 0, accum_iter)
-        for epoch in range(self.num_epochs):
+        # self.validate(dis_val_loader, 0, accum_iter)
+        for epoch in range(self.last_epoch, self.num_epochs):
             accum_iter = self.train_one_epoch(epoch, accum_iter, dis_train_loader, dis_val_loader, stage=1)
         
         metrics = self.test()
