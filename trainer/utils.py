@@ -139,3 +139,15 @@ class AverageMeter(object):
 
     def __format__(self, format):
         return "{self.val:{format}} ({self.avg:{format}})".format(self=self, format=format)
+
+class ListLoss(torch.nn.Module):
+    def __init__(self, k):
+        super(ListLoss, self).__init__()
+        self.k = k
+
+    def forward(self, logits):
+        item1 = torch.log(logits).sum()
+        t = torch.tril(torch.ones(logits.size(0), logits.size(0)),diagonal=0)
+        item2 = -torch.log(torch.matmul(logits,t)).sum()
+        gain = item1 + item2
+        return -gain

@@ -69,6 +69,8 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         elif self.loss == 'myranking':
             self.loss_func_1 = nn.MarginRankingLoss(margin=self.margin_topk)
             self.loss_func_2 = nn.MarginRankingLoss(margin=self.margin_neg)
+        elif self.loss == 'list':
+            self.loss_func = ListLoss(k=100)
         elif self.loss == 'kl+ct':
             self.loss_func_1 = nn.KLDivLoss(reduction='batchmean')
             self.loss_func_2 = nn.CrossEntropyLoss(ignore_index=0)
@@ -110,6 +112,12 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             logits_2 = logits[:, p:].reshape(-1)
             loss = self.loss_func_1(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
             loss += self.loss_func_2(logits, neg_logits, torch.ones(logits.shape).to(self.device))
+
+        elif self.loss == 'list':
+            logits = torch.gather(logits, -1, candidates)
+            logits = logits.view(-1, logits.size(-1))
+            labels = labels.view(-1, labels.size(-1))
+            loss = self.loss_func(logits)
             
         elif self.loss == 'kl+ct':
             logits = torch.gather(logits, -1, candidates)
