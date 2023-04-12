@@ -72,7 +72,10 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             self.loss_func_1 = nn.MarginRankingLoss(margin=self.margin_topk)
             self.loss_func_2 = nn.MarginRankingLoss(margin=self.margin_neg)
         elif self.loss == 'list':
-            self.loss_func = ListLoss(k=100)
+            self.loss_func = ListLoss()
+        elif self.loss == 'list+neg':
+            self.loss_func_1 = ListLoss()
+            self.loss_func_2 = nn.MarginRankingLoss(margin=self.margin_neg)
         elif self.loss == 'kl+ct':
             self.loss_func_1 = nn.KLDivLoss(reduction='batchmean')
             self.loss_func_2 = nn.CrossEntropyLoss(ignore_index=0)
@@ -119,6 +122,16 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             logits = torch.gather(logits, -1, candidates)
             logits = logits.view(-1, logits.size(-1))
             loss = self.loss_func(F.softmax(logits/self.tau, dim=-1))
+
+        elif self.loss == 'list+neg':
+            weight = torch.ones_like(logits).to(self.device)
+            weight[torch.arange(weight.size(0)).unsqueeze(1), candidates] = 0
+            neg_samples = torch.distributions.Categorical(F.softmax(weight, -1)).sample_n(candidates.size(-1)).permute(1, 0)
+            logits = torch.gather(logits, -1, candidates)
+            logits = logits.view(-1, logits.size(-1))
+            neg_logits = torch.gather(logits, -1, neg_samples)
+            loss = self.loss_func_1(F.softmax(logits/self.tau, dim=-1))
+            loss += self.loss_func_2(logits, neg_logits, torch.ones(logits.shape).to(self.device))
             
         elif self.loss == 'kl+ct':
             logits = torch.gather(logits, -1, candidates)
