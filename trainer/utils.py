@@ -147,7 +147,7 @@ class ListLoss(torch.nn.Module):
 
     def forward(self, logits):
         item1 = torch.log(logits).sum()
-        t = torch.tril(torch.ones(logits.size(0), logits.size(0)),diagonal=0)
+        t = torch.tril(torch.ones(logits.size(1), logits.size(1)),diagonal=0).to(logits.device)
         item2 = -torch.log(torch.matmul(logits,t)).sum()
         gain = item1 + item2
         return -gain
