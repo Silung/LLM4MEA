@@ -65,7 +65,7 @@ seqs, candidates, labels = batch
 | **4** | **attack_poison** | **bert**      | **-**                                                        |                                                              |
 | 4.1   | attack_poison     | bert          | C&W                                                          | ？                                                           |
 
-$loss_1=\frac{1}{k-1}\sum_{i=1}^{k-p-1}max(0,\hat{S}^k_{w[i+p]}-\hat{S}^k_{w[i]}+\lambda_1)+\frac{1}{k}\sum_{i=1}^{k}max(0,\hat{S}^k_{neg[i]}-\hat{S}^k_{w[i]}+\lambda_2),p=randint(1,(k + 1)//2)$
+$loss_1=\frac{1}{k-1}\sum_{i=1}^{k-p}max(0,\hat{S}^k_{w[i+p]}-\hat{S}^k_{w[i]}+\lambda_1)+\frac{1}{k}\sum_{i=1}^{k}max(0,\hat{S}^k_{neg[i]}-\hat{S}^k_{w[i]}+\lambda_2),p=randint(1,(k + 1)//2)$
 
 Learning to Rank: From Pairwise Approach to Listwise Approach
 
