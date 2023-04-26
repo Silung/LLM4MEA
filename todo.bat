@@ -43,6 +43,7 @@ python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --
 python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --num_generated_seqs 500 --batch_size 800 --num_epochs 1000
 python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --num_generated_seqs 500 --loss list+neg --batch_size 800 --num_epochs 1000
 python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --num_generated_seqs 500 --loss myranking --batch_size 800 --num_epochs 1000
+python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --num_generated_seqs 5000 --loss myranking --batch_size 800 --num_epochs 1000
 
 @REM On wk running
 python distill.py --dataset_code beauty --model_code sas --bb_model_code bert --num_generated_seqs 5000

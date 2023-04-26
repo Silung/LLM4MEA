@@ -20,6 +20,7 @@ class AbstractPoisonedDataset(metaclass=ABCMeta):
         self.method_code = method_code
         self.num_poisoned_seqs = num_poisoned_seqs
         self.num_original_seqs = num_original_seqs
+        self.poison_strategy = args.poison_strategy
 
     @classmethod
     @abstractmethod
@@ -90,8 +91,9 @@ class AbstractPoisonedDataset(metaclass=ABCMeta):
 
     def _get_subfolder_path(self):
         root = self._get_folder_path()
-        folder = 'poisoned' + str(self.num_poisoned_seqs) + '_' + 'original' + str(self.num_original_seqs)
-        return root.joinpath(self.method_code + '_target_' + str(self.target) + '_' + folder)
+        folder = 'poisoned' + str(self.num_poisoned_seqs) + '_' + 'original' + str(self.num_original_seqs) + '_' + self.poison_strategy
+        # return root.joinpath(self.method_code + '_target_' + str(self.target) + '_' + folder)
+        return root.joinpath(self.method_code + '_' + folder)
 
     def _get_poisoned_dataset_path(self):
         folder = self._get_subfolder_path()

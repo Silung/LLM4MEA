@@ -27,6 +27,7 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
         self.device = args.device
         self.num_items = args.num_items
         self.max_len = args.bert_max_len
+        self.poison_strategy = args.poison_strategy
         self.wb_model_spec = wb_model_spec
         self.wb_model = wb_model.to(self.device)
         self.bb_model = bb_model.to(self.device)
@@ -65,7 +66,7 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
         target_spec = '_'.join([str(target) for target in targets])
         self.train_loader, self.val_loader, self.test_loader = poi_train_loader_factory(self.args, target_spec, self.wb_model_spec, num_poisoned, num_original)
         self.bb_model.load_state_dict(torch.load(os.path.join(self.bb_model_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
-        self.export_root = 'experiments/retrained/' + self.wb_model_spec + '/' + self.args.dataset_code + '/ratio_' + str(ratio) + '_target_' + target_spec
+        self.export_root = 'experiments/retrained/' + self.wb_model_spec + '/' + self.args.dataset_code + '/ratio_' + str(ratio) + '_' + self.poison_strategy
         self.writer, self.train_loggers, self.val_loggers = self._create_loggers()
         self.logger_service = LoggerService(
             self.train_loggers, self.val_loggers)
@@ -104,57 +105,62 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
                     rand_items = torch.tensor(np.random.choice(self.num_items, size=seqs.size(0))+1).to(self.device)
                     seqs = torch.cat((seqs, rand_items.unsqueeze(1)), 1)
 
-                    if isinstance(self.wb_model, BERT):
-                        mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * seqs.size(0)).to(self.device)
-                        input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
-                        if j < self.max_len - 2:
-                            input_seqs[:, (self.max_len-3-j):-1] = seqs
-                        elif j == self.max_len - 2:
-                            input_seqs[:, :-1] = seqs[:, 1:]
-                        input_seqs[:, -1] = mask_items
-                        wb_embedding, mask = self.wb_model.embedding(input_seqs.long())
-                    elif isinstance(self.wb_model, SASRec):
-                        input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
-                        input_seqs[:, (self.max_len-2-j):] = seqs
-                        wb_embedding, mask = self.wb_model.embedding(input_seqs.long())
-                    elif isinstance(self.wb_model, NARM):
-                        input_seqs = seqs
-                        lengths = torch.tensor([j + 2] * seqs.size(0))
-                        wb_embedding, mask = self.wb_model.embedding(input_seqs, lengths)
-
-                    self.wb_model.train()
-                    wb_embedding = wb_embedding.detach().clone()
-                    wb_embedding.requires_grad = True
-                    wb_embedding.zero_grad()
-
-                    if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
-                        wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, mask)[:, -1, :]
-                    elif isinstance(self.wb_model, NARM):
-                        wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, lengths, mask)
-
-                    loss = self.adv_ce(wb_scores, selected_targets)
-                    self.wb_model.zero_grad()
-                    loss.backward()
-                    wb_embedding_grad = wb_embedding.grad.data
-                    
-                    self.wb_model.eval()
-                    with torch.no_grad():
+                    if self.poison_strategy == 'original':
                         if isinstance(self.wb_model, BERT):
-                            current_embedding = wb_embedding[:, -2]
-                            current_embedding_grad = wb_embedding_grad[:, -2]
-                        else:
-                            current_embedding = wb_embedding[:, -1]
-                            current_embedding_grad = wb_embedding_grad[:, -1]
+                            mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * seqs.size(0)).to(self.device)
+                            input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
+                            if j < self.max_len - 2:
+                                input_seqs[:, (self.max_len-3-j):-1] = seqs
+                            elif j == self.max_len - 2:
+                                input_seqs[:, :-1] = seqs[:, 1:]
+                            input_seqs[:, -1] = mask_items
+                            wb_embedding, mask = self.wb_model.embedding(input_seqs.long())
+                        elif isinstance(self.wb_model, SASRec):
+                            input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
+                            input_seqs[:, (self.max_len-2-j):] = seqs
+                            wb_embedding, mask = self.wb_model.embedding(input_seqs.long())
+                        elif isinstance(self.wb_model, NARM):
+                            input_seqs = seqs
+                            lengths = torch.tensor([j + 2] * seqs.size(0))
+                            wb_embedding, mask = self.wb_model.embedding(input_seqs, lengths)
+
+                        self.wb_model.train()
+                        wb_embedding = wb_embedding.detach().clone()
+                        wb_embedding.requires_grad = True
+                        if wb_embedding.grad is not None:
+                            wb_embedding.grad.zero_()
+
+                        if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
+                            wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, mask)[:, -1, :]
+                        elif isinstance(self.wb_model, NARM):
+                            wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, lengths, mask)
+
+                        loss = self.adv_ce(wb_scores, selected_targets.long())
+                        self.wb_model.zero_grad()
+                        loss.backward()
+                        wb_embedding_grad = wb_embedding.grad.data
                         
-                        all_embeddings = self.item_embeddings.unsqueeze(1).repeat_interleave(current_embedding.size(0), 1)
-                        cos = nn.CosineSimilarity(dim=-1, eps=1e-6)
-                        multipication_results = torch.t(cos(current_embedding-current_embedding_grad.sign(), all_embeddings))
-                        multipication_results[torch.arange(seqs.size(0)), selected_targets-1] = multipication_results[torch.arange(seqs.size(0)), selected_targets-1] + 2
-                        
-                        _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=False)
-                        sample_indices = torch.randint(0, 10, [seqs.size(0)])
-                        seqs[:, -1] = candidate_indicies[torch.arange(seqs.size(0)), sample_indices] + 1
-                        seqs = torch.cat((seqs, selected_targets.unsqueeze(1)), 1)
+                        self.wb_model.eval()
+                        with torch.no_grad():
+                            if isinstance(self.wb_model, BERT):
+                                current_embedding = wb_embedding[:, -2]
+                                current_embedding_grad = wb_embedding_grad[:, -2]
+                            else:
+                                current_embedding = wb_embedding[:, -1]
+                                current_embedding_grad = wb_embedding_grad[:, -1]
+                            
+                            all_embeddings = self.item_embeddings.unsqueeze(1).repeat_interleave(current_embedding.size(0), 1)
+                            cos = nn.CosineSimilarity(dim=-1, eps=1e-6)
+                            multipication_results = torch.t(cos(current_embedding-current_embedding_grad.sign(), all_embeddings))
+                            multipication_results[torch.arange(seqs.size(0)), selected_targets.long()-1] = multipication_results[torch.arange(seqs.size(0)), selected_targets.long()-1] + 2
+                            
+                            _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=False)
+                            sample_indices = torch.randint(0, 10, [seqs.size(0)])
+                            seqs[:, -1] = candidate_indicies[torch.arange(seqs.size(0)), sample_indices] + 1
+                            seqs = torch.cat((seqs, selected_targets.unsqueeze(1)), 1)
+                    elif self.poison_strategy == 'random':
+                        with torch.no_grad():
+                            seqs = torch.cat((seqs, selected_targets.unsqueeze(1)), 1)
             
             seqs = seqs[:, :self.max_len]
             try:

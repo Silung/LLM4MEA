@@ -192,6 +192,7 @@ parser.add_argument('--num_generated_seqs', type=int, default=3000)
 parser.add_argument('--num_original_seqs', type=int, default=0)
 parser.add_argument('--num_poisoned_seqs', type=int, default=100)
 parser.add_argument('--num_alter_items', type=int, default=10)
+parser.add_argument('--poison_strategy', type=str, default='original', choices=['original', 'random'])
 
 ################
 
