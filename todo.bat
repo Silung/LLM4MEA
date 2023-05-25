@@ -47,3 +47,6 @@ python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --
 
 @REM On wk running
 python distill.py --dataset_code beauty --model_code sas --bb_model_code bert --num_generated_seqs 5000
+
+python retrain.py --num_epochs 1000 --batch_size 500 
+python retrain.py --num_epochs 1000 --batch_size 500 --poison_strategy random

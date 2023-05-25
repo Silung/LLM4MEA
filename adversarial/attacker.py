@@ -22,7 +22,9 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
         self.device = args.device
         self.num_items = args.num_items
         self.max_len = args.bert_max_len
-        self.wb_model = wb_model.to(self.device)
+        self.attack_mode = args.attack_mode
+        if args.attack_mode != 'random':
+            self.wb_model = wb_model.to(self.device)
         self.bb_model = bb_model.to(self.device)
 
         self.metric_ks = args.metric_ks
@@ -31,14 +33,15 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
         self.CLOZE_MASK_TOKEN = args.num_items + 1
         self.adv_ce = nn.CrossEntropyLoss(ignore_index=0)
 
-        if isinstance(self.wb_model, BERT):
-            self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:-1]
-        else:
-            self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:]
+        if args.attack_mode != 'random':
+            if isinstance(self.wb_model, BERT):
+                self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:-1]
+            else:
+                self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:]
         
-        self.faiss_index = faiss.IndexFlatL2(self.item_embeddings.shape[-1])
-        self.faiss_index.add(self.item_embeddings)
-        self.item_embeddings = torch.tensor(self.item_embeddings).to(self.device)
+            self.faiss_index = faiss.IndexFlatL2(self.item_embeddings.shape[-1])
+            self.faiss_index.add(self.item_embeddings)
+            self.item_embeddings = torch.tensor(self.item_embeddings).to(self.device)
 
         if isinstance(self.bb_model, BERT):
             self.bb_item_embeddings = self.bb_model.embedding.token.weight.detach().cpu().numpy()[1:-1]
@@ -53,152 +56,185 @@ class AdversarialRankAttacker(metaclass=ABCMeta):
         tqdm_dataloader = tqdm(self.test_loader)
 
         for batch_idx, batch in enumerate(tqdm_dataloader):
-            self.wb_model.eval()
-            with torch.no_grad():
-                if isinstance(self.bb_model, BERT) or isinstance(self.bb_model, SASRec):
-                    seqs, candidates, labels = batch
-                    seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
-                    if isinstance(self.bb_model, BERT):
-                        seqs[:, 1:] = seqs[:, :-1]
-                        seqs[:, 0] = 0
-                elif isinstance(self.bb_model, NARM):
-                    seqs, lengths, candidates, labels = batch
-                    seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
-                    seqs = self.post2pre_padding(seqs)
-                
-                perturbed_seqs = seqs.clone()
-                # 在seq后添加num_attack个target item
-                append_items = torch.tensor([target]*(perturbed_seqs.size(0)*num_attack)).reshape(-1, num_attack)
-                perturbed_seqs = torch.cat((perturbed_seqs, torch.tensor(append_items).to(self.device)), 1)
+            if self.attack_mode == 'random':
+                with torch.no_grad():
+                    if isinstance(self.bb_model, BERT) or isinstance(self.bb_model, SASRec):
+                        seqs, candidates, labels = batch
+                        seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
+                        if isinstance(self.bb_model, BERT):
+                            seqs[:, 1:] = seqs[:, :-1]
+                            seqs[:, 0] = 0
+                    elif isinstance(self.bb_model, NARM):
+                        seqs, lengths, candidates, labels = batch
+                        seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
+                        seqs = self.post2pre_padding(seqs)
+                    
+                    perturbed_seqs = seqs.clone()
+                    # 在seq后添加num_attack个target item
+                    target_items = torch.tensor([target]*(perturbed_seqs.size(0)*(num_attack // 2))).reshape(-1, 1).to(self.device)
+                    rand_items = torch.tensor(np.random.choice(self.num_items, size=perturbed_seqs.size(0)*(num_attack // 2))+1).to(self.device).reshape(-1, 1)
+                    append_items = torch.cat((target_items, rand_items), 1).reshape(perturbed_seqs.size(0), -1)
+                    perturbed_seqs = torch.cat((perturbed_seqs, append_items), 1)
 
-                perturbed_seqs = perturbed_seqs[:, -self.max_len:]
-                if isinstance(self.wb_model, BERT):
-                    # MASK最后一个Item
-                    mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * perturbed_seqs.size(0)).to(self.device)
-                    perturbed_seqs[:, :-1] = perturbed_seqs[:, 1:]
-                    perturbed_seqs[:, -1] = mask_items
-                    wb_embedding, mask = self.wb_model.embedding(perturbed_seqs.long())
-                elif isinstance(self.wb_model, SASRec):
-                    wb_embedding, mask = self.wb_model.embedding(perturbed_seqs.long())
+                    best_seqs = perturbed_seqs[:, -self.max_len:]
+            else:
+                self.wb_model.eval()
+                with torch.no_grad():
+                    if isinstance(self.bb_model, BERT) or isinstance(self.bb_model, SASRec):
+                        seqs, candidates, labels = batch
+                        seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
+                        if isinstance(self.bb_model, BERT):
+                            seqs[:, 1:] = seqs[:, :-1]
+                            seqs[:, 0] = 0
+                    elif isinstance(self.bb_model, NARM):
+                        seqs, lengths, candidates, labels = batch
+                        seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
+                        seqs = self.post2pre_padding(seqs)
+                    
+                    perturbed_seqs = seqs.clone()
+                    # 在seq后添加num_attack个target item
+                    append_items = torch.tensor([target]*(perturbed_seqs.size(0)*num_attack)).reshape(-1, num_attack)
+                    perturbed_seqs = torch.cat((perturbed_seqs, torch.tensor(append_items).to(self.device)), 1)
+
+                    perturbed_seqs = perturbed_seqs[:, -self.max_len:]
+                    if isinstance(self.wb_model, BERT):
+                        # MASK最后一个Item
+                        mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * perturbed_seqs.size(0)).to(self.device)
+                        perturbed_seqs[:, :-1] = perturbed_seqs[:, 1:]
+                        perturbed_seqs[:, -1] = mask_items
+                        wb_embedding, mask = self.wb_model.embedding(perturbed_seqs.long())
+                    elif isinstance(self.wb_model, SASRec):
+                        wb_embedding, mask = self.wb_model.embedding(perturbed_seqs.long())
+                    elif isinstance(self.wb_model, NARM):
+                        perturbed_seqs = self.pre2post_padding(perturbed_seqs)
+                        lengths = (perturbed_seqs > 0).sum(-1).cpu().flatten()
+                        wb_embedding, mask = self.wb_model.embedding(perturbed_seqs.long(), lengths)
+
+                self.wb_model.train()
+                wb_embedding = wb_embedding.detach().clone()
+                wb_embedding.requires_grad = True
+                if wb_embedding.grad is not None:
+                    wb_embedding.grad.zero_()
+
+                if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
+                    wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, mask)[:, -1, :]
                 elif isinstance(self.wb_model, NARM):
-                    perturbed_seqs = self.pre2post_padding(perturbed_seqs)
-                    lengths = (perturbed_seqs > 0).sum(-1).cpu().flatten()
-                    wb_embedding, mask = self.wb_model.embedding(perturbed_seqs.long(), lengths)
+                    wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, lengths, mask)
 
-            self.wb_model.train()
-            wb_embedding = wb_embedding.detach().clone()
-            wb_embedding.requires_grad = True
-            wb_embedding.zero_grad()
+                # 与预测为target的情况计算Loss
+                loss = self.adv_ce(wb_scores, torch.tensor([target] * perturbed_seqs.size(0)).to(self.device))
+                self.wb_model.zero_grad()
+                loss.backward() # 这里没有进行参数更改
+                wb_embedding_grad = wb_embedding.grad.data
 
-            if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
-                wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, mask)[:, -1, :]
-            elif isinstance(self.wb_model, NARM):
-                wb_scores = self.wb_model.model(wb_embedding, self.wb_model.embedding.token.weight, lengths, mask)
+                self.wb_model.eval()
+                with torch.no_grad():
+                    appended_indicies = (perturbed_seqs != self.CLOZE_MASK_TOKEN)
+                    appended_indicies = (perturbed_seqs != 0) * appended_indicies
+                    appended_indicies = torch.arange(perturbed_seqs.shape[1]).to(self.device) * appended_indicies
+                    _, appended_indicies = torch.sort(appended_indicies, -1, descending=True)
+                    appended_indicies = appended_indicies[:, :num_attack]
+                    
+                    best_seqs = perturbed_seqs.clone().detach()
+                    for num in range(num_attack):
+                        row_indices = torch.arange(seqs.size(0))
+                        col_indices = appended_indicies[:, num]
 
-            # 与预测最后一个Item为target的情况计算Loss
-            loss = self.adv_ce(wb_scores, torch.tensor([target] * perturbed_seqs.size(0)).to(self.device))
-            self.wb_model.zero_grad()
-            loss.backward() # 这里没有进行参数更改
-            wb_embedding_grad = wb_embedding.grad.data
-
-            self.wb_model.eval()
-            with torch.no_grad():
-                appended_indicies = (perturbed_seqs != self.CLOZE_MASK_TOKEN)
-                appended_indicies = (perturbed_seqs != 0) * appended_indicies
-                appended_indicies = torch.arange(perturbed_seqs.shape[1]).to(self.device) * appended_indicies
-                _, appended_indicies = torch.sort(appended_indicies, -1, descending=True)
-                appended_indicies = appended_indicies[:, :num_attack]
-                
-                best_seqs = perturbed_seqs.clone().detach()
-                for num in range(num_attack):
-                    row_indices = torch.arange(seqs.size(0))
-                    col_indices = appended_indicies[:, num]
-
-                    current_embedding = wb_embedding[row_indices, col_indices]
-                    current_embedding_grad = wb_embedding_grad[row_indices, col_indices]
-                    all_embeddings = self.item_embeddings.unsqueeze(1).repeat_interleave(current_embedding.size(0), 1)
-                    cos = nn.CosineSimilarity(dim=-1, eps=1e-6)
-                    # compute cosine similarity scores S between ˜z − ϵsign(∇) and fw,e (i) ∀i ∈ I;
-                    # select n candidates C with highest S scores, exclude t if repeated;
-                    # 因为item domain是离散的,不能直接用˜z − ϵsign(∇)作为对抗样本,需要找最相似的
-                    # ˜z − ϵsign(∇) 想让输出向target靠拢
-                    multipication_results = torch.t(cos(current_embedding-current_embedding_grad.sign(), all_embeddings))
-                    _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=True)
-
-                    # 这些项目用白盒模型进行测试，使得得分最高的候选人被保留为对抗项目。
-                    # 是保留白盒测试的结果高的还是相似度最高的????
-                    if num == 0:
-                        multipication_results[:, target-1] = multipication_results[:, target-1] - 100000000
+                        current_embedding = wb_embedding[row_indices, col_indices]
+                        current_embedding_grad = wb_embedding_grad[row_indices, col_indices]
+                        all_embeddings = self.item_embeddings.unsqueeze(1).repeat_interleave(current_embedding.size(0), 1)
+                        cos = nn.CosineSimilarity(dim=-1, eps=1e-6)
+                        # compute cosine similarity scores S between ˜z − ϵsign(∇) and fw,e (i) ∀i ∈ I;
+                        # select n candidates C with highest S scores, exclude t if repeated;
+                        # 因为item domain是离散的,不能直接用˜z − ϵsign(∇)作为对抗样本,需要找最相似的
+                        # ˜z − ϵsign(∇) 想让输出向target靠拢
+                        multipication_results = torch.t(cos(current_embedding-current_embedding_grad.sign(), all_embeddings))
                         _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=True)
-                        best_seqs[row_indices, col_indices] = candidate_indicies[:, 0] + 1
 
-                        if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
-                            logits = F.softmax(self.wb_model(best_seqs)[:, -1, :], dim=-1)
-                        elif isinstance(self.wb_model, NARM):
-                            logits = F.softmax(self.wb_model(best_seqs, lengths), dim=-1)
-                        best_scores = torch.gather(logits, -1, torch.tensor([target] * best_seqs.size(0)).unsqueeze(1).to(self.device)).squeeze()
+                        # 这些项目用白盒模型进行测试，使得得分最高的候选人被保留为对抗项目。
+                        # 是保留白盒测试的结果高的还是相似度最高的????
+                        if num == 0:
+                            multipication_results[:, target-1] = multipication_results[:, target-1] - 100000000
+                            _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=True)
+                            best_seqs[row_indices, col_indices] = candidate_indicies[:, 0] + 1
 
-                    elif num > 0:
-                        prev_col_indices = appended_indicies[:, num-1]
-                        if_prev_target = (best_seqs[row_indices, prev_col_indices] == target)
-                        multipication_results[:, target-1] = multipication_results[:, target-1] + (if_prev_target * -100000000)
-                        _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=True)
-                        best_seqs[row_indices, col_indices] = best_seqs[row_indices, col_indices] * ~if_prev_target + \
-                            (candidate_indicies[:, 0] + 1) * if_prev_target
-                        
-                        if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
-                            logits = F.softmax(self.wb_model(best_seqs)[:, -1, :], dim=-1)
-                        elif isinstance(self.wb_model, NARM):
-                            logits = F.softmax(self.wb_model(best_seqs, lengths), dim=-1)
-                        best_scores = torch.gather(logits, -1, torch.tensor([target] * best_seqs.size(0)).unsqueeze(1).to(self.device)).squeeze()
+                            if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
+                                logits = F.softmax(self.wb_model(best_seqs)[:, -1, :], dim=-1)
+                            elif isinstance(self.wb_model, NARM):
+                                logits = F.softmax(self.wb_model(best_seqs, lengths), dim=-1)
+                            best_scores = torch.gather(logits, -1, torch.tensor([target] * best_seqs.size(0)).unsqueeze(1).to(self.device)).squeeze()
 
-                    # 尝试candidate中的多个对抗样本,多次找最好的,为在黑盒上测试准备
-                    for time in range(repeated_search):
-                        temp_seqs = best_seqs.clone().detach()
-                        temp_seqs[row_indices, col_indices] = candidate_indicies[:, time] + 1
+                        elif num > 0:
+                            prev_col_indices = appended_indicies[:, num-1]
+                            if_prev_target = (best_seqs[row_indices, prev_col_indices] == target)
+                            multipication_results[:, target-1] = multipication_results[:, target-1] + (if_prev_target * -100000000)
+                            _, candidate_indicies = torch.sort(multipication_results, dim=1, descending=True)
+                            best_seqs[row_indices, col_indices] = best_seqs[row_indices, col_indices] * ~if_prev_target + \
+                                (candidate_indicies[:, 0] + 1) * if_prev_target
+                            
+                            if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
+                                logits = F.softmax(self.wb_model(best_seqs)[:, -1, :], dim=-1)
+                            elif isinstance(self.wb_model, NARM):
+                                logits = F.softmax(self.wb_model(best_seqs, lengths), dim=-1)
+                            best_scores = torch.gather(logits, -1, torch.tensor([target] * best_seqs.size(0)).unsqueeze(1).to(self.device)).squeeze()
 
-                        if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
-                            logits = F.softmax(self.wb_model(temp_seqs)[:, -1, :], dim=-1)
-                        elif isinstance(self.wb_model, NARM):
-                            logits = F.softmax(self.wb_model(temp_seqs, lengths), dim=-1)
-                        temp_scores = torch.gather(logits, -1, torch.tensor([target] * temp_seqs.size(0)).unsqueeze(1).to(self.device)).squeeze()
+                        # 尝试candidate中的多个对抗样本,找在白盒模型上表现最好的,为在黑盒上测试准备
+                        for time in range(repeated_search):
+                            temp_seqs = best_seqs.clone().detach()
+                            temp_seqs[row_indices, col_indices] = candidate_indicies[:, time] + 1
 
-                        best_seqs[row_indices, col_indices] = temp_seqs[row_indices, col_indices] * (temp_scores >= best_scores) + best_seqs[row_indices, col_indices] * (temp_scores < best_scores)
-                        best_scores = temp_scores * (temp_scores >= best_scores) + best_scores * (temp_scores < best_scores)
-                        best_seqs = best_seqs.detach()
-                        best_scores = best_scores.detach()
-                        del temp_scores
+                            if isinstance(self.wb_model, BERT) or isinstance(self.wb_model, SASRec):
+                                logits = F.softmax(self.wb_model(temp_seqs)[:, -1, :], dim=-1)
+                            elif isinstance(self.wb_model, NARM):
+                                logits = F.softmax(self.wb_model(temp_seqs, lengths), dim=-1)
+                            temp_scores = torch.gather(logits, -1, torch.tensor([target] * temp_seqs.size(0)).unsqueeze(1).to(self.device)).squeeze()
+
+                            best_seqs[row_indices, col_indices] = temp_seqs[row_indices, col_indices] * (temp_scores >= best_scores) + best_seqs[row_indices, col_indices] * (temp_scores < best_scores)
+                            best_scores = temp_scores * (temp_scores >= best_scores) + best_scores * (temp_scores < best_scores)
+                            best_seqs = best_seqs.detach()
+                            best_scores = best_scores.detach()
+                            del temp_scores
             
             # 在黑盒模型上进行测试
             perturbed_seqs = best_seqs.detach()
-            if isinstance(self.wb_model, BERT) and isinstance(self.bb_model, BERT):
-                perturbed_scores = self.bb_model(perturbed_seqs)[:, -1, :]
-            elif isinstance(self.wb_model, BERT) and isinstance(self.bb_model, SASRec):
-                temp_seqs = torch.cat((torch.zeros(perturbed_seqs.size(0)).long().unsqueeze(1).to(self.device), perturbed_seqs[:, :-1]), dim=1)
-                perturbed_scores = self.bb_model(temp_seqs)[:, -1, :]
-            elif isinstance(self.wb_model, BERT) and isinstance(self.bb_model, NARM):
-                temp_seqs = torch.cat((torch.zeros(perturbed_seqs.size(0)).long().unsqueeze(1).to(self.device), perturbed_seqs[:, :-1]), dim=1)
-                temp_seqs = self.pre2post_padding(temp_seqs)
-                temp_lengths = (temp_seqs > 0).sum(-1).cpu().flatten()
-                perturbed_scores = self.bb_model(temp_seqs, temp_lengths)
-            elif isinstance(self.wb_model, SASRec) and isinstance(self.bb_model, SASRec):
-                perturbed_scores = self.bb_model(perturbed_seqs)[:, -1, :]
-            elif isinstance(self.wb_model, SASRec) and isinstance(self.bb_model, BERT):
-                temp_seqs = torch.cat((perturbed_seqs[:, 1:], torch.tensor([self.CLOZE_MASK_TOKEN] * perturbed_seqs.size(0)).unsqueeze(1).to(self.device)), dim=1)
-                perturbed_scores = self.bb_model(temp_seqs)[:, -1, :]
-            elif isinstance(self.wb_model, SASRec) and isinstance(self.bb_model, NARM):
-                temp_seqs = self.pre2post_padding(perturbed_seqs)
-                temp_lengths = (temp_seqs > 0).sum(-1).cpu().flatten()
-                perturbed_scores = self.bb_model(temp_seqs, temp_lengths)
-            elif isinstance(self.wb_model, NARM) and isinstance(self.bb_model, NARM):
-                perturbed_scores = self.bb_model(perturbed_seqs, lengths)
-            elif isinstance(self.wb_model, NARM) and isinstance(self.bb_model, BERT):
-                temp_seqs = self.post2pre_padding(perturbed_seqs)
-                temp_seqs = torch.cat((temp_seqs[:, 1:], torch.tensor([self.CLOZE_MASK_TOKEN] * perturbed_seqs.size(0)).unsqueeze(1).to(self.device)), dim=1)
-                perturbed_scores = self.bb_model(temp_seqs)[:, -1, :]
-            elif isinstance(self.wb_model, NARM) and isinstance(self.bb_model, SASRec):
-                temp_seqs = self.post2pre_padding(perturbed_seqs)
-                perturbed_scores = self.bb_model(temp_seqs)[:, -1, :]
+            if self.attack_mode == 'random':
+                if isinstance(self.bb_model, BERT):
+                    perturbed_scores = self.bb_model(perturbed_seqs)[:, -1, :]
+                elif isinstance(self.bb_model, SASRec):
+                    perturbed_scores = self.bb_model(perturbed_seqs)[:, -1, :]
+                elif isinstance(self.bb_model, NARM):
+                    temp_seqs = self.pre2post_padding(perturbed_seqs)
+                    temp_lengths = (temp_seqs > 0).sum(-1).cpu().flatten()
+                    perturbed_scores = self.bb_model(temp_seqs, temp_lengths)
+            else:
+                if isinstance(self.wb_model, BERT) and isinstance(self.bb_model, BERT):
+                    perturbed_scores = self.bb_model(perturbed_seqs)[:, -1, :]
+                elif isinstance(self.wb_model, BERT) and isinstance(self.bb_model, SASRec):
+                    temp_seqs = torch.cat((torch.zeros(perturbed_seqs.size(0)).long().unsqueeze(1).to(self.device), perturbed_seqs[:, :-1]), dim=1)
+                    perturbed_scores = self.bb_model(temp_seqs)[:, -1, :]
+                elif isinstance(self.wb_model, BERT) and isinstance(self.bb_model, NARM):
+                    temp_seqs = torch.cat((torch.zeros(perturbed_seqs.size(0)).long().unsqueeze(1).to(self.device), perturbed_seqs[:, :-1]), dim=1)
+                    temp_seqs = self.pre2post_padding(temp_seqs)
+                    temp_lengths = (temp_seqs > 0).sum(-1).cpu().flatten()
+                    perturbed_scores = self.bb_model(temp_seqs, temp_lengths)
+                elif isinstance(self.wb_model, SASRec) and isinstance(self.bb_model, SASRec):
+                    perturbed_scores = self.bb_model(perturbed_seqs)[:, -1, :]
+                elif isinstance(self.wb_model, SASRec) and isinstance(self.bb_model, BERT):
+                    temp_seqs = torch.cat((perturbed_seqs[:, 1:], torch.tensor([self.CLOZE_MASK_TOKEN] * perturbed_seqs.size(0)).unsqueeze(1).to(self.device)), dim=1)
+                    perturbed_scores = self.bb_model(temp_seqs)[:, -1, :]
+                elif isinstance(self.wb_model, SASRec) and isinstance(self.bb_model, NARM):
+                    temp_seqs = self.pre2post_padding(perturbed_seqs)
+                    temp_lengths = (temp_seqs > 0).sum(-1).cpu().flatten()
+                    perturbed_scores = self.bb_model(temp_seqs, temp_lengths)
+                elif isinstance(self.wb_model, NARM) and isinstance(self.bb_model, NARM):
+                    perturbed_scores = self.bb_model(perturbed_seqs, lengths)
+                elif isinstance(self.wb_model, NARM) and isinstance(self.bb_model, BERT):
+                    temp_seqs = self.post2pre_padding(perturbed_seqs)
+                    temp_seqs = torch.cat((temp_seqs[:, 1:], torch.tensor([self.CLOZE_MASK_TOKEN] * perturbed_seqs.size(0)).unsqueeze(1).to(self.device)), dim=1)
+                    perturbed_scores = self.bb_model(temp_seqs)[:, -1, :]
+                elif isinstance(self.wb_model, NARM) and isinstance(self.bb_model, SASRec):
+                    temp_seqs = self.post2pre_padding(perturbed_seqs)
+                    perturbed_scores = self.bb_model(temp_seqs)[:, -1, :]
             
             candidates[:, 0] = torch.tensor([target] * candidates.size(0)).to(self.device)    
             perturbed_scores = perturbed_scores.gather(1, candidates)

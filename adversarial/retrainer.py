@@ -24,12 +24,14 @@ from pathlib import Path
 class PoisonedGroupRetrainer(metaclass=ABCMeta):
     def __init__(self, args, wb_model_spec, wb_model, bb_model, original_test_loader, bb_model_root=None):
         self.args = args
+        self.retrained = args.retrained
         self.device = args.device
         self.num_items = args.num_items
         self.max_len = args.bert_max_len
-        self.poison_strategy = args.poison_strategy
+        self.poison_mode = args.poison_mode
         self.wb_model_spec = wb_model_spec
-        self.wb_model = wb_model.to(self.device)
+        if args.poison_mode != 'random':
+            self.wb_model = wb_model.to(self.device)
         self.bb_model = bb_model.to(self.device)
         self.is_parallel = args.num_gpu > 1
         if self.is_parallel:
@@ -43,15 +45,16 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
             self.bb_model_root = 'experiments/' + args.model_code + '/' + args.dataset_code
         else:
             self.bb_model_root = bb_model_root
-        
-        if isinstance(self.wb_model, BERT):
-            self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:-1]
-        else:
-            self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:]
-        
-        self.faiss_index = faiss.IndexFlatL2(self.item_embeddings.shape[-1])
-        self.faiss_index.add(self.item_embeddings)
-        self.item_embeddings = torch.tensor(self.item_embeddings).to(self.device)
+
+        if args.poison_mode != 'random':
+            if isinstance(self.wb_model, BERT):
+                self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:-1]
+            else:
+                self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:]
+            
+            self.faiss_index = faiss.IndexFlatL2(self.item_embeddings.shape[-1])
+            self.faiss_index.add(self.item_embeddings)
+            self.item_embeddings = torch.tensor(self.item_embeddings).to(self.device)
 
         self.CLOZE_MASK_TOKEN = args.num_items + 1
         self.adv_ce = nn.CrossEntropyLoss(ignore_index=0)
@@ -66,7 +69,7 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
         target_spec = '_'.join([str(target) for target in targets])
         self.train_loader, self.val_loader, self.test_loader = poi_train_loader_factory(self.args, target_spec, self.wb_model_spec, num_poisoned, num_original)
         self.bb_model.load_state_dict(torch.load(os.path.join(self.bb_model_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
-        self.export_root = 'experiments/retrained/' + self.wb_model_spec + '/' + self.args.dataset_code + '/ratio_' + str(ratio) + '_' + self.poison_strategy
+        self.export_root = 'experiments/retrained/' + self.wb_model_spec + '/' + self.args.dataset_code + '/ratio_' + str(ratio) + '_' + self.poison_mode
         self.writer, self.train_loggers, self.val_loggers = self._create_loggers()
         self.logger_service = LoggerService(
             self.train_loggers, self.val_loggers)
@@ -83,12 +86,12 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
         # if dataset.check_data_present():
         #     print('Dataset already exists. Skip generation')
         #     return
-
-        if isinstance(self.wb_model, BERT):
-            self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:-1]
-        else:
-            self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:]
-        self.item_embeddings = torch.tensor(self.item_embeddings).to(self.device)
+        if self.poison_mode != 'random':
+            if isinstance(self.wb_model, BERT):
+                self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:-1]
+            else:
+                self.item_embeddings = self.wb_model.embedding.token.weight.detach().cpu().numpy()[1:]
+            self.item_embeddings = torch.tensor(self.item_embeddings).to(self.device)
         
         batch_num = math.ceil(self.args.num_poisoned_seqs / batch_size)
         print('Generating poisoned dataset...')
@@ -98,14 +101,15 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
             seqs = torch.tensor(np.random.choice(targets, size=batch_size)).reshape(batch_size, 1).to(self.device)
 
             for j in range(self.max_len - 1):
-                self.wb_model.eval()
+                if self.poison_mode != 'random':
+                    self.wb_model.eval()
                 
                 if j % 2 == 0:
                     selected_targets = torch.tensor(np.random.choice(targets, size=batch_size)).to(self.device)
                     rand_items = torch.tensor(np.random.choice(self.num_items, size=seqs.size(0))+1).to(self.device)
                     seqs = torch.cat((seqs, rand_items.unsqueeze(1)), 1)
 
-                    if self.poison_strategy == 'original':
+                    if self.poison_mode == 'wb_grad':
                         if isinstance(self.wb_model, BERT):
                             mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * seqs.size(0)).to(self.device)
                             input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
@@ -158,7 +162,7 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
                             sample_indices = torch.randint(0, 10, [seqs.size(0)])
                             seqs[:, -1] = candidate_indicies[torch.arange(seqs.size(0)), sample_indices] + 1
                             seqs = torch.cat((seqs, selected_targets.unsqueeze(1)), 1)
-                    elif self.poison_strategy == 'random':
+                    elif self.poison_mode == 'random':
                         with torch.no_grad():
                             seqs = torch.cat((seqs, selected_targets.unsqueeze(1)), 1)
             
@@ -172,29 +176,31 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
         return num_poisoned, num_original, poisoning_users
 
     def train(self, targets):
-        self.optimizer = self._create_optimizer()
-        if self.args.enable_lr_schedule:
-            if self.args.enable_lr_warmup:
-                self.lr_scheduler = self.get_linear_schedule_with_warmup(
-                    self.optimizer, self.args.warmup_steps, len(train_loader) * self.num_epochs)
-            else:
-                self.lr_scheduler = optim.lr_scheduler.StepLR(
-                    self.optimizer, step_size=self.args.decay_step, gamma=self.args.gamma)
+        if not self.retrained:
+            self.optimizer = self._create_optimizer()
+            if self.args.enable_lr_schedule:
+                if self.args.enable_lr_warmup:
+                    self.lr_scheduler = self.get_linear_schedule_with_warmup(
+                        self.optimizer, self.args.warmup_steps, len(train_loader) * self.num_epochs)
+                else:
+                    self.lr_scheduler = optim.lr_scheduler.StepLR(
+                        self.optimizer, step_size=self.args.decay_step, gamma=self.args.gamma)
 
-        print('## Biased Retrain on Item {} ##'.format(targets))
-        accum_iter = 0
-        for epoch in range(self.num_epochs):
-            accum_iter = self.train_one_epoch(epoch, accum_iter)        
-        
+            print('## Biased Retrain on Item {} ##'.format(targets))
+            accum_iter = 0
+            for epoch in range(self.num_epochs):
+                accum_iter = self.train_one_epoch(epoch, accum_iter)        
+            
         print('## Clean Black-Box Model Targeted Test on Item {} ##'.format(targets))
         metrics_before = self.targeted_test(targets, load_retrained=False)
         print('## Retrained Black-Box Model Targeted Test on Item {} ##'.format(targets))
         metrics_after = self.targeted_test(targets, load_retrained=True)
         
-        self.logger_service.complete({
-            'state_dict': (self._create_state_dict()),
-        })
-        self.writer.close()
+        if not self.retrained:
+            self.logger_service.complete({
+                'state_dict': (self._create_state_dict()),
+            })
+            self.writer.close()
 
         return metrics_before, metrics_after
 
@@ -276,12 +282,13 @@ class PoisonedGroupRetrainer(metaclass=ABCMeta):
 
     def test(self, load_retrained=False):
         if load_retrained:
-            best_model_dict = torch.load(os.path.join(
-                self.export_root, 'models', 'best_acc_model.pth')).get(STATE_DICT_KEY)
+            # best_model_dict = torch.load(os.path.join(self.export_root, 'models', 'best_acc_model.pth')).get(STATE_DICT_KEY)
+            best_model_dict = torch.load(os.path.join(self.export_root, 'models', 'checkpoint-recent.pth.final')).get(STATE_DICT_KEY)
             self.bb_model.load_state_dict(best_model_dict)
         else:
             bb_model_dict = torch.load(os.path.join(
-                self.bb_model_root, 'models', 'best_acc_model.pth')).get(STATE_DICT_KEY)
+                # self.bb_model_root, 'models', 'best_acc_model.pth')).get(STATE_DICT_KEY)
+                self.bb_model_root, 'models', 'checkpoint-recent.pth.final')).get(STATE_DICT_KEY)
             self.bb_model.load_state_dict(bb_model_dict)
 
         self.bb_model.eval()

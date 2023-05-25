@@ -15,7 +15,7 @@ def fix_random_seed_as(random_seed):
     torch.backends.cudnn.benchmark = False
 
 
-def set_template(args):
+def set_template(args, mode='train'):
     args.min_uc = 5
     args.min_sc = 5
     args.split = 'leave_one_out'
@@ -30,6 +30,8 @@ def set_template(args):
         args.bert_max_len = 200
         args.bert_mask_prob = 0.2
         args.bert_max_predictions = 40
+        args.margin_topk = 0.75
+        args.margin_neg = 1.5
     elif args.dataset_code == 'ml-20m':
         args.sliding_window_size = 0.5
         args.bert_hidden_units = 64
@@ -46,6 +48,8 @@ def set_template(args):
         args.bert_max_len = 50
         args.bert_mask_prob = 0.6
         args.bert_max_predictions = 30
+        args.margin_topk = 0.5
+        args.margin_neg = 0.5
     elif args.dataset_code == 'games':
         args.sliding_window_size = 0.5
         args.bert_hidden_units = 64
@@ -62,6 +66,8 @@ def set_template(args):
         args.bert_max_len = 50
         args.bert_mask_prob = 0.4
         args.bert_max_predictions = 20
+        args.margin_topk = 0.5
+        args.margin_neg = 1.0
     elif args.dataset_code == 'yoochoose':
         args.sliding_window_size = 0.5
         args.bert_hidden_units = 256
@@ -192,9 +198,21 @@ parser.add_argument('--num_generated_seqs', type=int, default=3000)
 parser.add_argument('--num_original_seqs', type=int, default=0)
 parser.add_argument('--num_poisoned_seqs', type=int, default=100)
 parser.add_argument('--num_alter_items', type=int, default=10)
-parser.add_argument('--poison_strategy', type=str, default='original', choices=['original', 'random'])
+parser.add_argument('--poison_mode', type=str, default='wb_grad', choices=['wb_grad', 'bb_grad', 'random'], 
+                    help='''wb_grad:使用白盒模型的梯度信息生成对抗样本;\n
+                    bb_grad:使用黑盒模型的梯度信息生成对抗样本，相当于进行了完美的模型窃取;\n
+                    random:使用random item 与 target item 交替组成的序列进行攻击''')
+parser.add_argument('--retrained', action="store_true")
+parser.add_argument('--targets', type=str, default=None, choices=[None, 'top', 'middle', 'tail'])
+parser.add_argument('--margin_topk', type=float, default=0.5)
+parser.add_argument('--margin_neg', type=float, default=0.5)
 
 ################
-
+# Attacker
+################
+parser.add_argument('--attack_mode', type=str, default='wb_grad', choices=['wb_grad', 'bb_grad', 'random'], 
+                    help='''wb_grad:使用白盒模型的梯度信息生成对抗样本;\n
+                    bb_grad:使用黑盒模型的梯度信息生成对抗样本，相当于进行了完美的模型窃取;\n
+                    random:使用random item 与 target item 交替组成的序列进行攻击''')
 
 args = parser.parse_args()

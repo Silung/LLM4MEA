@@ -70,7 +70,7 @@ class NARMModel(nn.Module):
         self.b_vetor = nn.Linear(embed_size, 2 * hidden_size, bias=False)
 
     def forward(self, x, embedding_weight, lengths, mask):
-        x = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        x = pack_padded_sequence(x, lengths.to('cpu'), batch_first=True, enforce_sorted=False)
         gru_out, hidden = self.gru(x)
         gru_out, _ = pad_packed_sequence(gru_out, batch_first=True)
         c_global = hidden[-1]

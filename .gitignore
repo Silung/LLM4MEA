@@ -2,7 +2,13 @@
 *.p
 *.pt
 *.pth
+*.gz
+*.tmp
+*.pdf
+*.docx
+*.pptx
 .DS_Store
+temp.*
 
 /.ipynb_checkpoints/*
 /.vscode/*
@@ -10,3 +16,9 @@
 
 /data/*
 /gen_data/*
+
+/指导记录
+/答辩材料
+/答辩相关附件（发布版）
+/Self-Attentive Sequential Recommendation（翻译）
+

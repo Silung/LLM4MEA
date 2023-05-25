@@ -23,29 +23,36 @@ def attack(args, attack_item_num=2, bb_model_root=None):
     _, _, test_loader = dataloader_factory(args)
 
     model_codes = {'b': 'bert', 's':'sas', 'n':'narm'}
-    wb_model_code = model_codes[input('Input white box model code, b for BERT, s for SASRec and n for NARM: ')]
+    if args.attack_mode == 'random':
+        wb_model_spec = args.model_code + '_random'
+    else:
+        wb_model_code = model_codes[input('Input white box model code, b for BERT, s for SASRec and n for NARM: ')]
 
-    wb_model_folder = {}
-    folder_list = [item for item in os.listdir('experiments/distillation_rank/') if (args.model_code + '2' + wb_model_code in item)]
-    for idx, folder_name in enumerate(folder_list):
-        wb_model_folder[idx + 1] = folder_name
-    wb_model_folder[idx + 2] = args.model_code + '_black_box'
-    print(wb_model_folder)
-    wb_model_spec = wb_model_folder[int(input('Input index of desired white box model: '))]
+        wb_model_folder = {}
+        folder_list = [item for item in os.listdir('experiments/distillation_rank/') if (args.model_code + '2' + wb_model_code in item)]
+        for idx, folder_name in enumerate(folder_list):
+            wb_model_folder[idx + 1] = folder_name
+        wb_model_folder[idx + 2] = args.model_code + '_black_box'
 
-    wb_model_root = 'experiments/distillation_rank/' + wb_model_spec + '/' + args.dataset_code
-    if wb_model_spec == args.model_code + '_black_box':
-        wb_model_root = 'experiments/' + args.model_code + '/' + args.dataset_code
+        if args.attack_mode == 'bb_grad':
+            wb_model_spec = idx + 2
+        else:
+            print(wb_model_folder)
+            wb_model_spec = wb_model_folder[int(input('Input index of desired white box model: '))]
+            wb_model_root = 'experiments/distillation_rank/' + wb_model_spec + '/' + args.dataset_code
+            
+        if wb_model_spec == args.model_code + '_black_box':
+            wb_model_root = 'experiments/' + args.model_code + '/' + args.dataset_code
+
+        if wb_model_code == 'bert':
+            wb_model = BERT(args)
+        elif wb_model_code == 'sas':
+            wb_model = SASRec(args)
+        elif wb_model_code == 'narm':
+            wb_model = NARM(args)
 
     if bb_model_root == None:
         bb_model_root = 'experiments/' + args.model_code + '/' + args.dataset_code
-
-    if wb_model_code == 'bert':
-        wb_model = BERT(args)
-    elif wb_model_code == 'sas':
-        wb_model = SASRec(args)
-    elif wb_model_code == 'narm':
-        wb_model = NARM(args)
 
     if args.model_code == 'bert':
         bb_model = BERT(args)
@@ -55,7 +62,8 @@ def attack(args, attack_item_num=2, bb_model_root=None):
         bb_model = NARM(args)
     
     bb_model.load_state_dict(torch.load(os.path.join(bb_model_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
-    wb_model.load_state_dict(torch.load(os.path.join(wb_model_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
+    if args.attack_mode != 'random':
+        wb_model.load_state_dict(torch.load(os.path.join(wb_model_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
 
     item_counter = defaultdict(int)
     dataset = dataset_factory(args)
@@ -74,7 +82,10 @@ def attack(args, attack_item_num=2, bb_model_root=None):
         item_popularity.append((item_counter[i], i))
     item_popularity.sort(reverse=True)
     
-    attacker = AdversarialRankAttacker(args, wb_model, bb_model, test_loader)
+    if args.attack_mode == 'random':
+        attacker = AdversarialRankAttacker(args, None, bb_model, test_loader)
+    else:
+        attacker = AdversarialRankAttacker(args, wb_model, bb_model, test_loader)
             
     item_id = []
     item_rank = []
