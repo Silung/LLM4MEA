@@ -70,3 +70,20 @@ $loss_1=\frac{1}{k-1}\sum_{i=1}^{k-p}max(0,\hat{S}^k_{w[i+p]}-\hat{S}^k_{w[i]}+\
 Learning to Rank: From Pairwise Approach to Listwise Approach
 
 ![image-20230407104347238](pics/list_loss.png)
+
+
+
+相同模型结构，5k预算下使用自回归数据进行模型窃取攻击的性能
+
+| Dis-Loss | Dateset | BB-Model | WB-Model | epochs | type     | B    | N@1     | N@10    | R@1     | R@10    | A@1  | A@10 |
+| -------- | ------- | -------- | -------- | ------ | -------- | ---- | ------- | ------- | ------- | ------- | ---- | ---- |
+| -        | ml-1m   | NARM     | -        | 100    | BB-Model | -    | 0.44129 | 0.62459 | 0.44129 | 0.81407 | -    | -    |
+| -        | ml-1m   | SASRec   | -        | 2000   | BB-Model | -    | 0.41276 | 0.61218 | 0.41276 | 0.82383 | -    | -    |
+| -        | ml-1m   | BERT4Rec | -        | 2000   | BB-Model | -    | 0.39881 | 0.59510 | 0.39881 | 0.80007 | -    | -    |
+| -        | beauty  | NARM     | -        | 100    | BB-Model | -    | 0.21909 | 0.35600 | 0.21909 | 0.52042 | -    | -    |
+| -        | beauty  | SASRec   | -        | 1500   | BB-Model | -    | 0.21982 | 0.34477 | 0.21982 | 0.49497 | -    | -    |
+| -        | beauty  | BERT4Rec | -        | 568    | BB-Model | -    | 0.21144 | 0.34984 | 0.21144 | 0.51384 | -    | -    |
+| -        | steam   | NARM     | -        | 100    | BB-Model | -    | 0.42263 | 0.62472 | 0.42263 | 0.84806 | -    | -    |
+| -        | steam   | SASRec   | -        | 2000   | BB-Model | -    |         |         |         |         |      |      |
+|          |         |          |          |        |          |      |         |         |         |         |      |      |
+

@@ -14,7 +14,7 @@ class AbstractDistillationDataset(metaclass=ABCMeta):
         self.args = args
         self.bb_model_code = bb_model_code
         self.mode = mode
-        assert self.mode in ['random', 'autoregressive', 'adversarial']
+        self.id = id
 
     @classmethod
     @abstractmethod
@@ -58,11 +58,11 @@ class AbstractDistillationDataset(metaclass=ABCMeta):
 
     def _get_subfolder_path(self):
         root = self._get_folder_path()
-        return root.joinpath(self.bb_model_code + '_' + str(self.args.num_generated_seqs))
+        return root.joinpath(self.bb_model_code + '_' + str(self.args.num_generated_seqs) + f'_{self.args.k}')
 
     def _get_distillation_dataset_path(self):
         folder = self._get_subfolder_path()
-        return folder.joinpath(self.mode + '_dataset.pkl')
+        return folder.joinpath(self.mode + str(self.args.id) + '_dataset.pkl')
 
 
 class ML1MDistillationDataset(AbstractDistillationDataset):

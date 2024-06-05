@@ -85,22 +85,35 @@ class ML1MDataset(AbstractDataset):
         dataset_path = self._get_preprocessed_dataset_path()
         if dataset_path.is_file():
             print('Already preprocessed. Skip preprocessing')
-            return
-        if not dataset_path.parent.is_dir():
-            dataset_path.parent.mkdir(parents=True)
-        self.maybe_download_raw_dataset()
-        df = self.load_ratings_df()
-        df = self.filter_triplets(df)
-        df, umap, smap = self.densify_index(df)
-        train, val, test = self.split_df(df, len(umap))
-        dataset = {'train': train,
-                   'val': val,
-                   'test': test,
-                   'umap': umap,
-                   'smap': smap}
-        with dataset_path.open('wb') as f:
-            pickle.dump(dataset, f)
-
+        else:
+            if not dataset_path.parent.is_dir():
+                dataset_path.parent.mkdir(parents=True)
+            self.maybe_download_raw_dataset()
+            df = self.load_ratings_df()
+            df = self.filter_triplets(df)
+            df, umap, smap = self.densify_index(df)
+            train, val, test = self.split_df(df, len(umap))
+            dataset = {'train': train,
+                    'val': val,
+                    'test': test,
+                    'umap': umap,
+                    'smap': smap}
+            with dataset_path.open('wb') as f:
+                pickle.dump(dataset, f)
+        
+        text_path = self._get_preprocessed_text_path()
+        if text_path.is_file():
+            print('Text already preprocessed. Skip preprocessing')
+        else:
+            df_user = self.load_user_df()
+            df_item = self.load_item_df()
+            user_info = df_user.set_index('uid').to_dict()
+            item_info = df_item.set_index('sid').to_dict()
+            
+            text = {'user': user_info,
+                    'item': item_info}
+            with text_path.open('wb') as f:
+                pickle.dump(text, f)
     '''
     description: 加载movielens-1m数据中的ratings.dat文件，生成user-item-rating-time关系表
     param {*} self
@@ -112,3 +125,20 @@ class ML1MDataset(AbstractDataset):
         df = pd.read_csv(file_path, sep='::', header=None)
         df.columns = ['uid', 'sid', 'rating', 'timestamp']
         return df
+    
+    def load_user_df(self) -> pd.DataFrame:
+        folder_path = self._get_rawdata_folder_path()
+        file_path = folder_path.joinpath('users.dat')
+        df = pd.read_csv(file_path, sep='::', header=None)
+        # UserID::Gender::Age::Occupation::Zip-code
+        df.columns = ['uid', 'gen', 'age', 'occu', 'zip']
+        return df
+    
+    def load_item_df(self) -> pd.DataFrame:
+        folder_path = self._get_rawdata_folder_path()
+        file_path = folder_path.joinpath('movies.dat')
+        df = pd.read_csv(file_path, sep='::', header=None, encoding='ISO-8859-1')
+        # MovieID::Title::Genres
+        df.columns = ['sid', 'title', 'genres']
+        return df
+

@@ -73,6 +73,11 @@ class AbstractDataset(metaclass=ABCMeta):
         dataset_path = self._get_preprocessed_dataset_path()
         dataset = pickle.load(dataset_path.open('rb'))
         return dataset
+    
+    def load_text(self):
+        text_path = self._get_preprocessed_text_path()
+        text = pickle.load(text_path.open('rb'))
+        return text
 
     '''
     description: 过滤掉互动小于min_sc和min_uc的用户和物品
@@ -153,3 +158,7 @@ class AbstractDataset(metaclass=ABCMeta):
     def _get_preprocessed_dataset_path(self):
         folder = self._get_preprocessed_folder_path()
         return folder.joinpath('dataset.pkl')
+    
+    def _get_preprocessed_text_path(self):
+        folder = self._get_preprocessed_root_path()
+        return folder.joinpath(f'{self.code()}_text.pkl')

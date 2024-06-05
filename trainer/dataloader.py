@@ -47,7 +47,7 @@ class DistillationLoader():
         train_loader = data_utils.DataLoader(train, batch_size=self.args.train_batch_size,
                                            shuffle=True, pin_memory=True)
         val_loader = data_utils.DataLoader(val, batch_size=self.args.train_batch_size,
-                                           shuffle=True, pin_memory=True)
+                                           shuffle=False, pin_memory=True)
         return train_loader, val_loader
 
     def _get_datasets(self):

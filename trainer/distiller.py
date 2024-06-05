@@ -21,6 +21,7 @@ import numpy as np
 from abc import *
 from pathlib import Path
 
+from trainer.agent import *
 
 class NoDataRankDistillationTrainer(metaclass=ABCMeta):
     def __init__(self, args, model_code, model, bb_model, test_loader, export_root, loss='ranking', last_epoch=0, last_accum_iter=0, tau=1., margin_topk=0.5, margin_neg=0.5):
@@ -193,15 +194,25 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         return metrics
 
     def generate_autoregressive_data(self, k=100, batch_size=50):
-        dataset = dis_dataset_factory(self.args, self.model_code, 'autoregressive')
-        # if dataset.check_data_present():
-        #     print('Dataset already exists. Skip generation')
-        #     return
+        dataset = dis_dataset_factory(self.args, self.model_code, self.args.generated_sampler)
+        if dataset.check_data_present():
+            print('Dataset already exists. Skip generation')
+            return
+
+        if self.args.generated_sampler == 'llm':
+            agent = Agent(self.args)
+        if self.args.generated_sampler == 'llm_pfl':
+            agent = ProfileAgent(self.args)
+        else:
+            agent = None
         
         batch_num = self.args.num_generated_seqs // batch_size + 1
         print('Generating dataset...')
         for i in tqdm(range(batch_num)):
+            if agent is not None:
+                agent.clear()
             seqs = torch.randint(1, self.num_items + 1, (batch_size, 1)).to(self.device)
+            # print(f'first item: {seqs[0]}')
             logits = None
             candidates = None
             
@@ -216,21 +227,46 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         labels = self.bb_model(input_seqs.long())[:, -1, :]
 
                         _, sorted_items = torch.sort(labels[:, 1:-1], dim=-1, descending=True)
-                        sorted_items = sorted_items[:, :k] + 1
-                        randomized_label = torch.rand(sorted_items.shape).to(self.device)
-                        randomized_label = randomized_label / randomized_label.sum(dim=-1).unsqueeze(-1)
-                        randomized_label, _ = torch.sort(randomized_label, dim=-1, descending=True)
+                        
+                        sorted_items_k = sorted_items[:, :k] + 1
+                            
+                        if agent is not None:
+                            # if k > 10:
+                            #     idx = torch.randperm(sorted_items_k.shape[1])
+                            #     sorted_items_k = sorted_items_k[:, idx].view(sorted_items_k.size())
+                            #     sorted_items = sorted_items_k[:,:10]
+                            # else:
+                                # sorted_items = sorted_items_k
+                            sorted_items = []
+                            t_sorted_items_k = sorted_items_k.cpu().numpy()
+                            t_seqs = seqs.cpu().numpy()
+                            for w, items in enumerate(t_sorted_items_k):
+                                items_list = list(set(items) - set(t_seqs[w]))
+                                if len(items_list) == 0:
+                                    items_list = list(items)
+                                random.shuffle(items_list)
+                                sorted_items.append(items_list)
+                            sorted_items = torch.tensor(sorted_items)
+                            selected_indices = agent(sorted_items)
+                            randomized_label = torch.ones_like(sorted_items_k).to(self.device)
+                        else:
+                            sorted_items = sorted_items_k
+                            randomized_label = torch.rand(sorted_items.shape).to(self.device)
+                            randomized_label = randomized_label / randomized_label.sum(dim=-1).unsqueeze(-1)
+                            randomized_label, _ = torch.sort(randomized_label, dim=-1, descending=True)
 
-                        selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
+                            selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
                         row_indices = torch.arange(sorted_items.size(0))
-                        seqs = torch.cat((seqs, sorted_items[row_indices, selected_indices].unsqueeze(1)), 1)
+                        seqs = torch.cat((seqs, sorted_items[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
 
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
-                            candidates = torch.cat((candidates, sorted_items.unsqueeze(1)), 1)
+                            candidates = torch.cat((candidates, sorted_items_k.unsqueeze(1)), 1)
                         except:
                             logits = randomized_label.unsqueeze(1)
-                            candidates = sorted_items.unsqueeze(1)
+                            candidates = sorted_items_k.unsqueeze(1)
+                        
+                        # print(f'seqs[0]: {seqs[0]}')
                     
                     input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
                     input_seqs[:, :-1] = seqs[:, 1:]
@@ -242,6 +278,8 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     randomized_label = randomized_label / randomized_label.sum(dim=-1).unsqueeze(-1)
                     randomized_label, _ = torch.sort(randomized_label, dim=-1, descending=True)
                     
+                    # print(logits.shape)
+                    # print(randomized_label.shape)
                     logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
                     candidates = torch.cat((candidates, sorted_items.unsqueeze(1)), 1)
 
@@ -327,9 +365,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         self.writer, self.train_loggers, self.val_loggers = self._create_loggers()
         self.logger_service = LoggerService(
             self.train_loggers, self.val_loggers)
-        self.generate_autoregressive_data()
-        dis_train_loader, dis_val_loader = dis_train_loader_factory(self.args, self.model_code, 'autoregressive')
-        print('## Distilling model via autoregressive data... ##')
+        self.generate_autoregressive_data(k=self.args.k, batch_size=1)
+        dis_train_loader, dis_val_loader = dis_train_loader_factory(self.args, self.model_code, self.args.generated_sampler)
+        print(f'## Distilling model via {self.args.generated_sampler} data... ##')
         # self.validate(dis_val_loader, 0, accum_iter)
         for epoch in range(self.last_epoch, self.num_epochs):
             accum_iter = self.train_one_epoch(epoch, accum_iter, dis_train_loader, dis_val_loader, stage=1)

@@ -17,7 +17,7 @@ except:
 def distill(args, bb_model_root=None, export_root=None, resume=False):
     args.lr = 0.001
     args.enable_lr_warmup = False
-    fix_random_seed_as(args.model_init_seed)
+    # fix_random_seed_as(args.model_init_seed)
     _, _, test_loader = dataloader_factory(args)
 
     if args.model_code == 'bert':
@@ -43,7 +43,7 @@ def distill(args, bb_model_root=None, export_root=None, resume=False):
     if bb_model_root == None:
         bb_model_root = 'experiments/' + args.bb_model_code + '/' + args.dataset_code
     if export_root == None:
-        folder_name = args.bb_model_code + '2' + args.model_code + '_autoregressive' + args.loss + str(args.num_generated_seqs)
+        folder_name = args.bb_model_code + '2' + args.model_code + '_' + args.generated_sampler + str(args.k) + args.loss + str(args.num_generated_seqs)
         export_root = 'experiments/distillation_rank/' + folder_name + '/' + args.dataset_code
 
     bb_model.load_state_dict(torch.load(os.path.join(bb_model_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
@@ -72,5 +72,5 @@ if __name__ == "__main__":
     # args.min_sc = k
     if args.device =='dml' and torch_directml.is_available():
         args.device = torch_directml.device(torch_directml.default_device())
-    distill(args=args, resume=True)
+    distill(args=args, resume=False)
 

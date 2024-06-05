@@ -195,6 +195,8 @@ parser.add_argument('--bert_mask_prob', type=float, default=0.2)
 # Distillation & Retraining
 ################
 parser.add_argument('--num_generated_seqs', type=int, default=3000)
+parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'llm_pfl', 'mix'])
+parser.add_argument('-k', type=int, default=100)
 parser.add_argument('--num_original_seqs', type=int, default=0)
 parser.add_argument('--num_poisoned_seqs', type=int, default=100)
 parser.add_argument('--num_alter_items', type=int, default=10)
@@ -214,5 +216,11 @@ parser.add_argument('--attack_mode', type=str, default='wb_grad', choices=['wb_g
                     help='''wb_grad:使用白盒模型的梯度信息生成对抗样本;\n
                     bb_grad:使用黑盒模型的梯度信息生成对抗样本，相当于进行了完美的模型窃取;\n
                     random:使用random item 与 target item 交替组成的序列进行攻击''')
+
+
+parser.add_argument('--id', type=str, default='')
+parser.add_argument('--port', type=int, default=1960)
+parser.add_argument('--shuffle', action="store_true")
+
 
 args = parser.parse_args()

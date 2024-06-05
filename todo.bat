@@ -50,3 +50,14 @@ python distill.py --dataset_code beauty --model_code sas --bb_model_code bert --
 
 python retrain.py --num_epochs 1000 --batch_size 500 
 python retrain.py --num_epochs 1000 --batch_size 500 --poison_strategy random
+
+
+python distill.py --dataset_code ml-1m --model_code sas --bb_model_code sas --num_generated_seqs 500 --generated_sampler llm
+python distill.py --dataset_code ml-1m --model_code sas --bb_model_code sas --num_generated_seqs 500 --generated_sampler autoregressive
+python distill.py --dataset_code ml-1m --model_code narm --bb_model_code narm --num_generated_seqs 500 --generated_sampler llm
+python distill.py --dataset_code ml-1m --model_code narm --bb_model_code narm --num_generated_seqs 500 --generated_sampler autoregressive
+python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --num_generated_seqs 500 --generated_sampler llm
+python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --num_generated_seqs 500 --generated_sampler autoregressive
+
+
+python distill.py --dataset_code ml-1m --model_code bert --bb_model_code bert --num_generated_seqs 2500 --generated_sampler llm -k 10
