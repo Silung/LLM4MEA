@@ -45,18 +45,16 @@ class Agent():
         # 创建字典
         data_to_send = msg
         
-        # print(data_to_send)
-        
         # 序列化字典为JSON格式
         data_to_send_json = json.dumps(data_to_send)
         
-        # print(data_to_send_json[80:250])
+        # print(data_to_send_json)
         # 发送数据
         client_socket.send(data_to_send_json.encode())
         # 接收数据
         received_data = client_socket.recv(40960).decode()
         
-        # print(received_data[80:250])
+        # print(received_data)
         # 关闭连接
         client_socket.close()
         
@@ -151,7 +149,7 @@ class Agent():
             output = []
             for i, text in enumerate(texts):
                 # print(self.mem[i])
-                ex_items = ', '.join(self.watched_items[i])[-50:]
+                ex_items = ', '.join(self.watched_items[i][-50:])
                 output.append([{"role": "user", "content": f"You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! {text}"}])
                 
         if self.mem is None:
@@ -181,25 +179,25 @@ class Agent():
     
 
 class ProfileAgent(Agent):
-    def init_profiles(self, size):
-        def extract_json_from_text(text):
-            # 定义匹配JSON对象的正则表达式
-            json_pattern = r'\{[^{}]*\}'
-            
-            # 使用re.findall来查找所有符合正则表达式的JSON对象
-            json_strings = re.findall(json_pattern, text)
-            
-            # 尝试解析找到的JSON字符串，并返回有效的JSON对象
-            json_objects = []
-            for json_str in json_strings:
-                try:
-                    json_obj = json.loads(json_str)
-                    json_objects.append(json_obj)
-                except json.JSONDecodeError:
-                    continue
-            
-            return json_objects
+    def extract_json_from_text(self, text):
+        # 定义匹配JSON对象的正则表达式
+        json_pattern = r'\{[^{}]*\}'
         
+        # 使用re.findall来查找所有符合正则表达式的JSON对象
+        json_strings = re.findall(json_pattern, text)
+        
+        # 尝试解析找到的JSON字符串，并返回有效的JSON对象
+        json_objects = []
+        for json_str in json_strings:
+            try:
+                json_obj = json.loads(json_str)
+                json_objects.append(json_obj)
+            except json.JSONDecodeError:
+                continue
+        
+        return json_objects
+    
+    def init_profiles(self, size):
         self.profiles = []
         print('Initing profiles...')
         profile_query = {"role": "user", "content": f'The user profiles include gender, age, traits, career, interests, and behavioral features. The traits describe the user\'s personality, such as being "compassionate", "ambitious", or "optimistic". The interests indicate the user\'s preferences on the items, such as "sci-fi movies" or "comedy videos". Now generate a random user profile and only return the profile content with json format.'}
@@ -213,18 +211,33 @@ class ProfileAgent(Agent):
             received_data = self.send_rev(query)
             query[0].append(received_data[0]['generation'])
             for data in received_data:
-                jsons = extract_json_from_text(data['generation']['content'])
+                jsons = self.extract_json_from_text(data['generation']['content'])
                 if len(jsons) == 1:
                     self.profiles.append(jsons[0])
                 else:
                     raise("Init user profiles error!")
             
-    
+    def update_profiles(self, idxs, batch_size):
+        # print('Updating profiles...')
+        for idx in idxs:
+            json_str = json.dumps(self.profiles[idx])
+            ex_items = ', '.join(self.watched_items[idx%batch_size][-50:])
+            query = [[{"role": "user", "content": f'The user profiles include gender, age, traits, career, interests, and behavioral features. The traits describe the user\'s personality, such as being "compassionate", "ambitious", or "optimistic". The interests indicate the user\'s preferences on the items, such as "sci-fi movies" or "comedy videos". You are a user with your own hobbies, this is some information about you: {json_str}. And you have saw {ex_items}. Now update your profile and only return the profile content with json format.'}]]
+            received_data = self.send_rev(query)
+            for data in received_data:
+                jsons = self.extract_json_from_text(data['generation']['content'])
+                if len(jsons) == 1:
+                    self.profiles[idx] = jsons[0]
+                else:
+                    print("Update user profiles error!")
+                    print(jsons)
+        
     def __call__(self, sorted_items):
         try:
             sorted_items = sorted_items.cpu().numpy()
         except:
             sorted_items = sorted_items.numpy()
+        
         query = self.encode(sorted_items)
         # print(query[0])
         received_data = self.send_rev(query)
@@ -256,7 +269,7 @@ class ProfileAgent(Agent):
             for idx, text in enumerate(texts):
                 # print(self.mem[i])
                 json_str = json.dumps(self.profiles[idx])
-                ex_items = ', '.join(self.watched_items[idx])[-50:]
+                ex_items = ', '.join(self.watched_items[idx][-50:])
                 output.append([{"role": "system", "content": f"This is some information about you: {json_str}. "},
                                {"role": "user", "content": f"You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! {text}"}])
                 

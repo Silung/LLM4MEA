@@ -206,7 +206,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         else:
             agent = None
         
-        batch_num = self.args.num_generated_seqs // batch_size + 1
+        batch_num = self.args.num_generated_seqs // batch_size
         print('Generating dataset...')
         for i in tqdm(range(batch_num)):
             if agent is not None:
@@ -221,6 +221,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                 if isinstance(self.bb_model, BERT):
                     mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * seqs.size(0)).to(self.device)
                     for j in range(self.max_len - 1):
+                        if j != 0 and j % 50 == 0:
+                            agent.update_profiles(list(range(i, self.args.num_generated_seqs if (i+1) * batch_size > self.args.num_generated_seqs else (i+1) * batch_size)), batch_size)
+                        
                         input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
                         input_seqs[:, (self.max_len-2-j):-1] = seqs
                         input_seqs[:, -1] = mask_items
