@@ -197,36 +197,44 @@ class ProfileAgent(Agent):
         
         return json_objects
     
+    # def init_profiles(self, size):
+    #     self.profiles = []
+    #     print('Initing profiles...')
+    #     profile_query = {"role": "user", "content": f'The user profiles include gender, age, traits, career, interests, and behavioral features. The traits describe the user\'s personality, such as being "compassionate", "ambitious", or "optimistic". The interests indicate the user\'s preferences on the items, such as "sci-fi movies" or "comedy videos". Now generate a random user profile and only return the profile content with json format.'}
+    #     query = None
+    #     for i in trange(size):
+    #         if query is None:
+    #             query = [[profile_query]]
+    #         else:
+    #             query = [query[0][-26:]]
+    #             query[0].append(profile_query)
+    #         received_data = self.send_rev(query)
+    #         query[0].append(received_data[0]['generation'])
+    #         for data in received_data:
+    #             jsons = self.extract_json_from_text(data['generation']['content'])
+    #             if len(jsons) == 1:
+    #                 self.profiles.append(jsons[0])
+    #             else:
+    #                 raise("Init user profiles error!")
+    
     def init_profiles(self, size):
-        self.profiles = []
-        print('Initing profiles...')
-        profile_query = {"role": "user", "content": f'The user profiles include gender, age, traits, career, interests, and behavioral features. The traits describe the user\'s personality, such as being "compassionate", "ambitious", or "optimistic". The interests indicate the user\'s preferences on the items, such as "sci-fi movies" or "comedy videos". Now generate a random user profile and only return the profile content with json format.'}
-        query = None
-        for i in trange(size):
-            if query is None:
-                query = [[profile_query]]
-            else:
-                query = [query[0][-26:]]
-                query[0].append(profile_query)
-            received_data = self.send_rev(query)
-            query[0].append(received_data[0]['generation'])
-            for data in received_data:
-                jsons = self.extract_json_from_text(data['generation']['content'])
-                if len(jsons) == 1:
-                    self.profiles.append(jsons[0])
-                else:
-                    raise("Init user profiles error!")
+        self.profiles = [[] for i in range(size)]
             
     def update_profiles(self, idxs, batch_size):
         # print('Updating profiles...')
         for idx in idxs:
-            json_str = json.dumps(self.profiles[idx])
             ex_items = ', '.join(self.watched_items[idx%batch_size][-50:])
-            query = [[{"role": "user", "content": f'The user profiles include gender, age, traits, career, interests, and behavioral features. The traits describe the user\'s personality, such as being "compassionate", "ambitious", or "optimistic". The interests indicate the user\'s preferences on the items, such as "sci-fi movies" or "comedy videos". You are a user with your own hobbies, this is some information about you: {json_str}. And you have saw {ex_items}. Now update your profile and only return the profile content with json format.'}]]
+            if len(self.profiles[idx]) == 0:
+                query = [[{"role": "user", "content": f'The user profiles include gender, age, traits, career, interests, and behavioral features. The traits describe the user\'s personality, such as being "compassionate", "ambitious", or "optimistic". The interests indicate the user\'s preferences on the items, such as "sci-fi movies" or "comedy videos". You are a user with your own hobbies, and you have saw {ex_items}. Now generate your profile randomly according to the history and only return the profile content with json format.'}]]
+            else:
+                json_str = json.dumps(self.profiles[idx])
+                query = [[{"role": "user", "content": f'The user profiles include gender, age, traits, career, interests, and behavioral features. The traits describe the user\'s personality, such as being "compassionate", "ambitious", or "optimistic". The interests indicate the user\'s preferences on the items, such as "sci-fi movies" or "comedy videos". You are a user with your own hobbies, this is some information about you: {json_str}. And you have saw {ex_items}. Now update your profile and there must be something changed. Only return the profile content with json format and don\'t record watched movies.'}]]
             received_data = self.send_rev(query)
             for data in received_data:
                 jsons = self.extract_json_from_text(data['generation']['content'])
                 if len(jsons) == 1:
+                    # print(self.profiles[idx])
+                    # print(jsons[0])
                     self.profiles[idx] = jsons[0]
                 else:
                     print("Update user profiles error!")
@@ -261,17 +269,23 @@ class ProfileAgent(Agent):
             output = []
             for idx, text in enumerate(texts):
                 # sys = {"role": "system", "content": ""}
-                json_str = json.dumps(self.profiles[idx])
+                if len(self.profiles[idx]) == 0:
+                    json_str = 'None'
+                else:
+                    json_str = json.dumps(self.profiles[idx])
                 output.append([{"role": "system", "content": f"This is some information about you: {json_str}. "},
-                            {"role": "user", "content": f'You are a user with your own hobbies. Now, I want to recommend a few more movies to you. Select one that you are most interested in. Only answer the title! {text}'}])
+                            {"role": "user", "content": f'You are a user with your own hobbies. Now, I want to recommend movies to you. Select one that you are most interested in. Only answer the title! {text}'}])
         else:
             output = []
             for idx, text in enumerate(texts):
                 # print(self.mem[i])
-                json_str = json.dumps(self.profiles[idx])
+                if len(self.profiles[idx]) == 0:
+                    json_str = 'None'
+                else:
+                    json_str = json.dumps(self.profiles[idx])
                 ex_items = ', '.join(self.watched_items[idx][-50:])
                 output.append([{"role": "system", "content": f"This is some information about you: {json_str}. "},
-                               {"role": "user", "content": f"You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! {text}"}])
+                               {"role": "user", "content": f"You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a more diverse movie that you are interested in and have not watched yet. Only answer with the title, no other words. {text}"}])
                 
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]

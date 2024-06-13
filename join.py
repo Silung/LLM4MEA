@@ -2,13 +2,13 @@ import os
 import pickle
 
 root = 'gen_data/ml-1m/bert_250_100'
-paths = ['llm_pfl0_dataset.pkl','llm_pfl1_dataset.pkl','llm_pfl2_dataset.pkl','llm_pfl3_dataset.pkl']
+paths = ['llm_pfl4_dataset.pkl','llm_pfl5_dataset.pkl']
 datasets = []
 for path in paths:
     with open(os.path.join(root, path), 'rb') as f:
          datasets.append(pickle.load(f))
     
-k=1001
+k=500
 seqs, logits, candidates = [], [], []
 for dataset in datasets:
     seqs += dataset['seqs']
