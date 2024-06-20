@@ -1,4 +1,5 @@
 import re
+import ast
 import pickle
 import socket
 import json
@@ -33,6 +34,11 @@ class Agent():
         self.t = 70
         
         self.init_profiles(self.args.num_generated_seqs)
+        try:
+            with open('examples_in_ml.txt', 'r') as f:
+                self.history = f.read().split('\n')
+        except:
+            self.history = None
         
         
     def send_rev(self, msg):        
@@ -176,7 +182,104 @@ class Agent():
     
     def init_profiles(self, size):
         pass
+
+    def update_profiles(self, idxs, batch_size):
+        pass
     
+class ExampleAgent(Agent):
+    def template(self, titles, genres):
+        # output: list shaped same as Batch
+        
+        def join(ts, gs):
+            t = ''
+            for i in range(len(ts)):
+                t += f'{i+1}. {ts[i]}({gs[i]}); '
+            return t
+        
+        texts = np.vectorize(join, signature='(n),(n)->()')(titles, genres)
+        
+        i = random.randint(0, 4)
+        if self.mem is None:
+            # sys = {"role": "system", "content": ""}
+            output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[i]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select one that you are most interested in. Only answer the title! '}] for text in texts]
+        else:
+            output = []
+            for i, text in enumerate(texts):
+                # print(self.mem[i])
+                ex_items = ', '.join(self.watched_items[i][-50:])
+                output.append([{"role": "user", "content": f"This is the viewing history of a certain user: {self.history[i]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! "}])
+                
+        if self.mem is None:
+            self.mem = [[] for i in range(len(titles))]
+        if self.watched_items is None:
+            self.watched_items = [[] for i in range(len(titles))]
+        # print(output)
+        return output
+    
+class SeqAgent(Agent):
+    def template(self, titles, genres):
+        # output: list shaped same as Batch
+        
+        def join(ts, gs):
+            t = ''
+            for i in range(len(ts)):
+                t += f'{i+1}. {ts[i]}({gs[i]}); '
+            return t
+        
+        texts = np.vectorize(join, signature='(n),(n)->()')(titles, genres)
+        
+        j = random.randint(0, 4)
+        if self.mem is None:
+            # sys = {"role": "system", "content": ""}
+            output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure only answer the title without other words! '}] for text in texts]
+        else:
+            output = []
+            for i, text in enumerate(texts):
+                # print(self.mem[i])
+                ex_items = ', '.join(self.watched_items[i][-50:])
+                output.append([{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words! '}])
+                
+        if self.mem is None:
+            self.mem = [[] for i in range(len(titles))]
+        if self.watched_items is None:
+            self.watched_items = [[] for i in range(len(titles))]
+        # print(output)
+        return output
+    
+    def find(self, t_list, s):
+        t_list =list(t_list)
+        idx = []
+        pattern = r'\[.*?\]'
+        match = re.search(pattern, s)
+        if match:
+            list_str = match.group()
+            for s in list_str.split(','):
+                best_match = process.extractOne(s, t_list)
+                if best_match[1] > self.t:
+                    idx.append(t_list.index(best_match[0]))
+                else:
+                    idx.append(random.randint(0, len(t_list)-1))
+        else:
+            idx = [random.randint(0, len(t_list)-1) for i in range(10)]
+        if len(idx) != 10:
+            idx = [random.randint(0, len(t_list)-1) for i in range(10)]
+        return idx
+    
+    def decode(self, received_data):
+        # input: llm return
+        # output: index in sorted_items
+            
+        text = [ans['generation']['content'] for ans in received_data]
+
+        # selected_indices = np.vectorize(find, signature='(n),(n)->(n)')(self.titles, text)
+        selected_indices = [self.find(self.titles[i], text[i]) for i in range(len(text))]
+        for i in range(len(text)):
+            self.watched_items[i] += list(self.titles[i][selected_indices[i]])
+        
+        for i, ans in enumerate(received_data):
+            self.mem[i].append(ans['generation'])
+        
+        return selected_indices
 
 class ProfileAgent(Agent):
     def extract_json_from_text(self, text):
@@ -273,8 +376,9 @@ class ProfileAgent(Agent):
                     json_str = 'None'
                 else:
                     json_str = json.dumps(self.profiles[idx])
+                i = random.randint(0, 4)
                 output.append([{"role": "system", "content": f"This is some information about you: {json_str}. "},
-                            {"role": "user", "content": f'You are a user with your own hobbies. Now, I want to recommend movies to you. Select one that you are most interested in. Only answer the title! {text}'}])
+                            {"role": "user", "content": f'This is the viewing history of a certain user: {self.history[i]}. You are a user with your own hobbies. Now, I want to recommend movies to you. Select one that you are most interested in. Only answer the title! {text}'}])
         else:
             output = []
             for idx, text in enumerate(texts):
@@ -284,8 +388,9 @@ class ProfileAgent(Agent):
                 else:
                     json_str = json.dumps(self.profiles[idx])
                 ex_items = ', '.join(self.watched_items[idx][-50:])
+                i = random.randint(0, 4)
                 output.append([{"role": "system", "content": f"This is some information about you: {json_str}. "},
-                               {"role": "user", "content": f"You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a more diverse movie that you are interested in and have not watched yet. Only answer with the title, no other words. {text}"}])
+                               {"role": "user", "content": f"This is the viewing history of a certain user: {self.history[i]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a movie that related to your watching history and profile, and have not watched yet. Only answer with the title, no other words. {text}"}])
                 
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]

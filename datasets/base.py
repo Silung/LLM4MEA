@@ -125,8 +125,7 @@ class AbstractDataset(metaclass=ABCMeta):
             # 按user聚合items
             user_group = df.groupby('uid')
             # 根据timestamp排序
-            user2items = user_group.progress_apply(
-                lambda d: list(d.sort_values(by=['timestamp', 'sid'])['sid']))
+            user2items = user_group.progress_apply(lambda d: list(d.sort_values(by=['timestamp', 'sid'])['sid']))
             # 划分数据
             train, val, test = {}, {}, {}
             for i in range(user_count):

@@ -195,7 +195,7 @@ parser.add_argument('--bert_mask_prob', type=float, default=0.2)
 # Distillation & Retraining
 ################
 parser.add_argument('--num_generated_seqs', type=int, default=3000)
-parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'llm_pfl', 'mix'])
+parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'llm_pfl', 'mix', 'llm_exam', 'llm_seq'])
 parser.add_argument('-k', type=int, default=100)
 parser.add_argument('--num_original_seqs', type=int, default=0)
 parser.add_argument('--num_poisoned_seqs', type=int, default=100)

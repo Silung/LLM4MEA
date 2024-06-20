@@ -2,7 +2,7 @@ import os
 import pickle
 
 root = 'gen_data/ml-1m/bert_250_100'
-paths = ['llm_pfl4_dataset.pkl','llm_pfl5_dataset.pkl']
+paths = ['llm_seq0_dataset.pkl','llm_seq1_dataset.pkl']
 datasets = []
 for path in paths:
     with open(os.path.join(root, path), 'rb') as f:
