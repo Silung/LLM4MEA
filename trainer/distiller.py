@@ -208,7 +208,10 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             agent = ExampleAgent(self.args)
         elif self.args.generated_sampler == 'llm_seq':
             agent = SeqAgent(self.args)
-            gen_step = 10
+            if self.args.dataset_code == 'ml-1m':
+                gen_step = 10
+            elif self.args.dataset_code == 'beauty':
+                gen_step = 5
         else:
             agent = None
             print(f'generated_sampler: {self.args.generated_sampler}')
@@ -229,7 +232,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                 if isinstance(self.bb_model, BERT):
                     mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * seqs.size(0)).to(self.device)
                     for j in range(self.max_len - 1):
-                        if j != 0 and j % 30 == 0:
+                        if agent is not None and j != 0 and j % 30 == 0:
                             agent.update_profiles(list(range(i, self.args.num_generated_seqs if (i+1) * batch_size > self.args.num_generated_seqs else (i+1) * batch_size)), batch_size)
                         
                         input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
@@ -392,7 +395,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         # self.validate(dis_val_loader, 0, accum_iter)
         for epoch in range(self.last_epoch, self.num_epochs):
             accum_iter = self.train_one_epoch(epoch, accum_iter, dis_train_loader, dis_val_loader, stage=1)
-            if epoch % 10 == 0:
+            if epoch != 0 and epoch % 10 == 0:
                 print(self.test())
         metrics = self.test()
         

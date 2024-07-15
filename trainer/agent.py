@@ -40,6 +40,12 @@ class Agent():
         except:
             self.history = None
         
+        if self.dataset_code == 'ml-1m':
+            self.his_size = 50
+            self.seq_size = 10
+        elif self.dataset_code == 'beauty':
+            self.his_size = 10
+            self.seq_size = 5
         
     def send_rev(self, msg):        
         # 创建TCP socket
@@ -76,8 +82,10 @@ class Agent():
         # ]]
         self.org_items = np.vectorize(self.r_smap.get)(sorted_items)
         self.titles = np.vectorize(self.item_info['title'].get)(self.org_items)
-        self.genres = np.vectorize(self.item_info['genres'].get)(self.org_items)
-        
+        if self.dataset_code == 'ml-1m':
+            self.genres = np.vectorize(self.item_info['genres'].get)(self.org_items)
+        elif self.dataset_code == 'beauty':
+            self.genres = None        
         # output = self.template1(self.titles, self.genres)
         output = self.template(self.titles, self.genres)
 
@@ -143,21 +151,30 @@ class Agent():
         def join(ts, gs):
             t = ''
             for i in range(len(ts)):
-                t += f'{i+1}. {ts[i]}({gs[i]}); '
+                if self.dataset_code == 'ml-1m':
+                    t += f'{i+1}. {ts[i]}({gs[i]}); '
+                elif self.dataset_code == 'beauty':
+                    t += f'{i+1}. {ts[i]}; '
             return t
         
         texts = np.vectorize(join, signature='(n),(n)->()')(titles, genres)
         
         if self.mem is None:
             # sys = {"role": "system", "content": ""}
-            output = [[{"role": "user", "content": f'You are a user with your own hobbies. Now, I want to recommend a few more movies to you. Select one that you are most interested in. Only answer the title! {text}'}] for text in texts]
+            if self.dataset_code == 'ml-1m':
+                output = [[{"role": "user", "content": f'You are a user with your own preference. Now, I want to recommend a few more movies to you. Select one that you are most interested in. Only answer the title! {text}'}] for text in texts]
+            elif self.dataset_code == 'beauty':
+                output = [[{"role": "user", "content": f'You are a user with your own preference. Now, I want to recommend a few more items to you. Select one that you are most interested in. Only answer the title! {text}'}] for text in texts]
         else:
             output = []
             for i, text in enumerate(texts):
                 # print(self.mem[i])
-                ex_items = ', '.join(self.watched_items[i][-50:])
-                output.append([{"role": "user", "content": f"You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! {text}"}])
-                
+                ex_items = ', '.join(self.watched_items[i][-self.his_size:])
+                if self.dataset_code == 'ml-1m':
+                    output.append([{"role": "user", "content": f"You are a user with your own preference, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! {text}"}])
+                elif self.dataset_code == 'beauty':
+                   output.append([{"role": "user", "content": f"You are a user with your own preference, and you have saw {ex_items}. Now, I want to recommend a few more items to you. Choose an items that you are interested in and have not selected yet. Only answer the title without other words! {text}"}])
+     
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]
         if self.watched_items is None:
@@ -198,16 +215,16 @@ class ExampleAgent(Agent):
         
         texts = np.vectorize(join, signature='(n),(n)->()')(titles, genres)
         
-        i = random.randint(0, 4)
+        j = random.randint(0, 9)
         if self.mem is None:
             # sys = {"role": "system", "content": ""}
-            output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[i]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select one that you are most interested in. Only answer the title! '}] for text in texts]
+            output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select one that you are most interested in. Only answer the title! '}] for text in texts]
         else:
             output = []
             for i, text in enumerate(texts):
                 # print(self.mem[i])
-                ex_items = ', '.join(self.watched_items[i][-50:])
-                output.append([{"role": "user", "content": f"This is the viewing history of a certain user: {self.history[i]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! "}])
+                ex_items = ', '.join(self.watched_items[i][-self.his_size:])
+                output.append([{"role": "user", "content": f"This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! "}])
                 
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]
@@ -220,25 +237,45 @@ class SeqAgent(Agent):
     def template(self, titles, genres):
         # output: list shaped same as Batch
         
-        def join(ts, gs):
+        def join1(ts, gs):
             t = ''
             for i in range(len(ts)):
                 t += f'{i+1}. {ts[i]}({gs[i]}); '
             return t
         
-        texts = np.vectorize(join, signature='(n),(n)->()')(titles, genres)
+        def join2(ts):
+            t = ''
+            for i in range(len(ts)):
+                t += f'{i+1}. {ts[i][:80]}; '
+            return t
         
-        j = random.randint(0, 4)
+        if self.dataset_code == 'ml-1m':
+            texts = np.vectorize(join1, signature='(n),(n)->()')(titles, genres)
+        elif self.dataset_code == 'beauty':
+            texts = np.vectorize(join2, signature='(n)->()')(titles)
+        
+        # j = random.randint(0, 9)
         if self.mem is None:
             # sys = {"role": "system", "content": ""}
-            output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure only answer the title without other words! '}] for text in texts]
+            # output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure only answer the title without other words! '}] for text in texts]
+            if self.dataset_code == 'ml-1m':
+                output = [[{"role": "user", "content": f'You are a user with your own preference. Now, I want to recommend a few more movies to you: {text}. Select {self.seq_size} movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure only answer the title without other words! '}] for text in texts]
+            elif self.dataset_code == 'beauty':
+                output = [[{"role": "user", "content": f"You are a user with your own preference. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure only answer the title without other words! "}] for text in texts]
         else:
             output = []
             for i, text in enumerate(texts):
                 # print(self.mem[i])
-                ex_items = ', '.join(self.watched_items[i][-50:])
-                output.append([{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words! '}])
-                
+                # if len(', '.join(self.watched_items[i][-5:])) > 380:
+                #     self.watched_items[i] = self.watched_items[i][:-self.seq_size]
+                ex_items = ', '.join(self.watched_items[i][-self.his_size:])
+                # print(len(', '.join(self.watched_items[i][-5:])))
+                if self.dataset_code == 'ml-1m':
+                    # output.append([{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words! '}])
+                    output.append([{"role": "user", "content": f'You are a user with your own preference, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Select {self.seq_size} movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words! '}])
+                elif self.dataset_code == 'beauty':
+                    output.append([{"role": "user", "content": f"You are a user with your own preference, and you have saw {ex_items}. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure not to choose items you have bought and only answer the title without other words! "}])
+                    
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]
         if self.watched_items is None:
@@ -253,16 +290,18 @@ class SeqAgent(Agent):
         match = re.search(pattern, s)
         if match:
             list_str = match.group()
-            for s in list_str.split(','):
+            # print(list_str)
+            for s in list_str.split("', '"):
                 best_match = process.extractOne(s, t_list)
                 if best_match[1] > self.t:
                     idx.append(t_list.index(best_match[0]))
                 else:
                     idx.append(random.randint(0, len(t_list)-1))
         else:
-            idx = [random.randint(0, len(t_list)-1) for i in range(10)]
-        if len(idx) != 10:
-            idx = [random.randint(0, len(t_list)-1) for i in range(10)]
+            idx = [random.randint(0, len(t_list)-1) for i in range(self.seq_size)]
+        # print(len(idx))
+        if len(idx) != self.seq_size:
+            idx = [random.randint(0, len(t_list)-1) for i in range(self.seq_size)]
         return idx
     
     def decode(self, received_data):
@@ -274,7 +313,10 @@ class SeqAgent(Agent):
         # selected_indices = np.vectorize(find, signature='(n),(n)->(n)')(self.titles, text)
         selected_indices = [self.find(self.titles[i], text[i]) for i in range(len(text))]
         for i in range(len(text)):
-            self.watched_items[i] += list(self.titles[i][selected_indices[i]])
+            # new_his = [item[:100] for item in list(self.titles[i][selected_indices[i]])]
+            new_his = list(self.titles[i][selected_indices[i]])
+            # print(new_his[0])
+            self.watched_items[i] += new_his
         
         for i, ans in enumerate(received_data):
             self.mem[i].append(ans['generation'])
@@ -326,7 +368,7 @@ class ProfileAgent(Agent):
     def update_profiles(self, idxs, batch_size):
         # print('Updating profiles...')
         for idx in idxs:
-            ex_items = ', '.join(self.watched_items[idx%batch_size][-50:])
+            ex_items = ', '.join(self.watched_items[idx%batch_size][-self.his_size:])
             if len(self.profiles[idx]) == 0:
                 query = [[{"role": "user", "content": f'The user profiles include gender, age, traits, career, interests, and behavioral features. The traits describe the user\'s personality, such as being "compassionate", "ambitious", or "optimistic". The interests indicate the user\'s preferences on the items, such as "sci-fi movies" or "comedy videos". You are a user with your own hobbies, and you have saw {ex_items}. Now generate your profile randomly according to the history and only return the profile content with json format.'}]]
             else:
@@ -387,7 +429,7 @@ class ProfileAgent(Agent):
                     json_str = 'None'
                 else:
                     json_str = json.dumps(self.profiles[idx])
-                ex_items = ', '.join(self.watched_items[idx][-50:])
+                ex_items = ', '.join(self.watched_items[idx][-self.his_size:])
                 i = random.randint(0, 4)
                 output.append([{"role": "system", "content": f"This is some information about you: {json_str}. "},
                                {"role": "user", "content": f"This is the viewing history of a certain user: {self.history[i]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a movie that related to your watching history and profile, and have not watched yet. Only answer with the title, no other words. {text}"}])

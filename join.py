@@ -1,14 +1,15 @@
 import os
 import pickle
 
-root = 'gen_data/ml-1m/bert_250_100'
-paths = ['llm_seq0_dataset.pkl','llm_seq1_dataset.pkl']
+root = 'gen_data/beauty/bert_1250_100'
+paths = [f'llm_seq{i}_dataset.pkl' for i in range(4,8)]
+print(paths)
 datasets = []
 for path in paths:
     with open(os.path.join(root, path), 'rb') as f:
          datasets.append(pickle.load(f))
     
-k=500
+k=5000
 seqs, logits, candidates = [], [], []
 for dataset in datasets:
     seqs += dataset['seqs']
