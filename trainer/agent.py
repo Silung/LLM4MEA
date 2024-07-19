@@ -43,7 +43,10 @@ class Agent():
         if self.dataset_code == 'ml-1m':
             self.his_size = 50
             self.seq_size = 10
-        elif self.dataset_code == 'beauty':
+        elif self.dataset_code == 'steam':
+            self.his_size = 15
+            self.seq_size = 5
+        else:
             self.his_size = 10
             self.seq_size = 5
         
@@ -82,10 +85,12 @@ class Agent():
         # ]]
         self.org_items = np.vectorize(self.r_smap.get)(sorted_items)
         self.titles = np.vectorize(self.item_info['title'].get)(self.org_items)
-        if self.dataset_code == 'ml-1m':
+        if self.dataset_code in ['ml-1m', 'steam']:
             self.genres = np.vectorize(self.item_info['genres'].get)(self.org_items)
         elif self.dataset_code == 'beauty':
-            self.genres = None        
+            self.genres = None
+        elif self.dataset_code == 'games':
+            self.genres = None
         # output = self.template1(self.titles, self.genres)
         output = self.template(self.titles, self.genres)
 
@@ -151,7 +156,7 @@ class Agent():
         def join(ts, gs):
             t = ''
             for i in range(len(ts)):
-                if self.dataset_code == 'ml-1m':
+                if self.dataset_code in ['ml-1m', 'steam']:
                     t += f'{i+1}. {ts[i]}({gs[i]}); '
                 elif self.dataset_code == 'beauty':
                     t += f'{i+1}. {ts[i]}; '
@@ -163,7 +168,7 @@ class Agent():
             # sys = {"role": "system", "content": ""}
             if self.dataset_code == 'ml-1m':
                 output = [[{"role": "user", "content": f'You are a user with your own preference. Now, I want to recommend a few more movies to you. Select one that you are most interested in. Only answer the title! {text}'}] for text in texts]
-            elif self.dataset_code == 'beauty':
+            elif self.dataset_code in ['beauty', 'steam']:
                 output = [[{"role": "user", "content": f'You are a user with your own preference. Now, I want to recommend a few more items to you. Select one that you are most interested in. Only answer the title! {text}'}] for text in texts]
         else:
             output = []
@@ -172,9 +177,9 @@ class Agent():
                 ex_items = ', '.join(self.watched_items[i][-self.his_size:])
                 if self.dataset_code == 'ml-1m':
                     output.append([{"role": "user", "content": f"You are a user with your own preference, and you have saw {ex_items}. Now, I want to recommend a few more movies to you. Choose a movie that you are interested in and have not watched yet. Only answer the title without other words! {text}"}])
-                elif self.dataset_code == 'beauty':
-                   output.append([{"role": "user", "content": f"You are a user with your own preference, and you have saw {ex_items}. Now, I want to recommend a few more items to you. Choose an items that you are interested in and have not selected yet. Only answer the title without other words! {text}"}])
-     
+                elif self.dataset_code in ['beauty', 'steam']:
+                   output.append([{"role": "user", "content": f"You are a user with your own preference, and you have bought {ex_items}. Now, I want to recommend a few more items to you. Choose an items that you are interested in and have not selected yet. Only answer the title without other words! {text}"}])
+                
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]
         if self.watched_items is None:
@@ -249,9 +254,9 @@ class SeqAgent(Agent):
                 t += f'{i+1}. {ts[i][:80]}; '
             return t
         
-        if self.dataset_code == 'ml-1m':
+        if self.dataset_code in ['ml-1m']:
             texts = np.vectorize(join1, signature='(n),(n)->()')(titles, genres)
-        elif self.dataset_code == 'beauty':
+        elif self.dataset_code in ['beauty', 'steam']:
             texts = np.vectorize(join2, signature='(n)->()')(titles)
         
         # j = random.randint(0, 9)
@@ -260,7 +265,7 @@ class SeqAgent(Agent):
             # output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure only answer the title without other words! '}] for text in texts]
             if self.dataset_code == 'ml-1m':
                 output = [[{"role": "user", "content": f'You are a user with your own preference. Now, I want to recommend a few more movies to you: {text}. Select {self.seq_size} movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure only answer the title without other words! '}] for text in texts]
-            elif self.dataset_code == 'beauty':
+            elif self.dataset_code in ['beauty', 'steam']:
                 output = [[{"role": "user", "content": f"You are a user with your own preference. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure only answer the title without other words! "}] for text in texts]
         else:
             output = []
@@ -273,9 +278,9 @@ class SeqAgent(Agent):
                 if self.dataset_code == 'ml-1m':
                     # output.append([{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words! '}])
                     output.append([{"role": "user", "content": f'You are a user with your own preference, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Select {self.seq_size} movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words! '}])
-                elif self.dataset_code == 'beauty':
-                    output.append([{"role": "user", "content": f"You are a user with your own preference, and you have saw {ex_items}. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure not to choose items you have bought and only answer the title without other words! "}])
-                    
+                elif self.dataset_code in ['beauty', 'steam']:
+                    output.append([{"role": "user", "content": f"You are a user with your own preference, and you have bought {ex_items}. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure not to choose items you have bought and only answer the title without other words! "}])
+
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]
         if self.watched_items is None:

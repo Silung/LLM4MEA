@@ -28,6 +28,7 @@ class SteamDataset(AbstractDataset):
     @classmethod
     def url(cls):
         return 'http://cseweb.ucsd.edu/~wckang/steam_reviews.json.gz'
+        # item信息：http://cseweb.ucsd.edu/~wckang/steam_games.json.gz
 
     @classmethod
     def zip_file_content_is_folder(cls):
@@ -79,21 +80,34 @@ class SteamDataset(AbstractDataset):
         dataset_path = self._get_preprocessed_dataset_path()
         if dataset_path.is_file():
             print('Already preprocessed. Skip preprocessing')
-            return
-        if not dataset_path.parent.is_dir():
-            dataset_path.parent.mkdir(parents=True)
-        self.maybe_download_raw_dataset()
-        df = self.load_ratings_df()
-        df = self.filter_triplets(df)
-        df, umap, smap = self.densify_index(df)
-        train, val, test = self.split_df(df, len(umap))
-        dataset = {'train': train,
-                   'val': val,
-                   'test': test,
-                   'umap': umap,
-                   'smap': smap}
-        with dataset_path.open('wb') as f:
-            pickle.dump(dataset, f)
+        else:
+            if not dataset_path.parent.is_dir():
+                dataset_path.parent.mkdir(parents=True)
+            self.maybe_download_raw_dataset()
+            df = self.load_ratings_df()
+            df = self.filter_triplets(df)
+            df, umap, smap = self.densify_index(df)
+            train, val, test = self.split_df(df, len(umap))
+            dataset = {'train': train,
+                    'val': val,
+                    'test': test,
+                    'umap': umap,
+                    'smap': smap}
+            with dataset_path.open('wb') as f:
+                pickle.dump(dataset, f)
+
+        text_path = self._get_preprocessed_text_path()
+        if text_path.is_file():
+            print('Text already preprocessed. Skip preprocessing')
+        else:
+            df_item = self.load_item()
+            user_info = None
+            item_info = df_item.set_index('sid').to_dict()
+            
+            text = {'user': user_info,
+                    'item': item_info}
+            with text_path.open('wb') as f:
+                pickle.dump(text, f)
 
     '''
     description: 生成user-item-time关系表
@@ -110,3 +124,34 @@ class SteamDataset(AbstractDataset):
             data.append([temp['username'], temp['product_id'], temp['date']])
 
         return pd.DataFrame(data, columns=['uid', 'sid', 'timestamp'])
+
+    def load_item(self) -> pd.DataFrame:
+        folder_path = self._get_rawdata_folder_path()
+        file_path = folder_path.joinpath('steam_games.json')
+        data = []
+        f = open(file_path, 'r', encoding='utf-8')
+        for line in f.readlines():
+            temp = ast.literal_eval(line)
+            t = []
+            if 'id' in temp:
+                t.append(temp['id'])
+            else:
+                continue
+
+            if 'title' in temp:
+                t.append(temp['title'])
+            elif 'app_name' in temp:
+                t.append(temp['app_name'])
+            else:
+                t.append(temp['id'])
+
+            if 'tags' in temp:
+                t.append(', '.join(temp['tags'][:3]))
+            elif 'genres' in temp:
+                t.append(', '.join(temp['genres'][:3]))
+            else:
+                t.append(None)
+
+            data.append(t)
+
+        return pd.DataFrame(data, columns=['sid', 'title', 'genres'])

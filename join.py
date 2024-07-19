@@ -1,8 +1,8 @@
 import os
 import pickle
 
-root = 'gen_data/beauty/bert_1250_100'
-paths = [f'llm_seq{i}_dataset.pkl' for i in range(4,8)]
+root = 'gen_data/steam/bert_1000_100'
+paths = [f'llm_seq{i}_dataset.pkl' for i in range(5,10)]
 print(paths)
 datasets = []
 for path in paths:

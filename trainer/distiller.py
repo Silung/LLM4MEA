@@ -210,7 +210,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             agent = SeqAgent(self.args)
             if self.args.dataset_code == 'ml-1m':
                 gen_step = 10
-            elif self.args.dataset_code == 'beauty':
+            elif self.args.dataset_code in ['beauty', 'steam']:
                 gen_step = 5
         else:
             agent = None
@@ -309,26 +309,55 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
 
                 elif isinstance(self.bb_model, SASRec):
                     for j in range(self.max_len - 1):
+                        if agent is not None and j != 0 and j % 30 == 0:
+                            agent.update_profiles(list(range(i, self.args.num_generated_seqs if (i+1) * batch_size > self.args.num_generated_seqs else (i+1) * batch_size)), batch_size)
+                        
                         input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
                         input_seqs[:, (self.max_len-1-j):] = seqs
                         labels = self.bb_model(input_seqs.long())[:, -1, :]
 
                         _, sorted_items = torch.sort(labels[:, 1:], dim=-1, descending=True)
-                        sorted_items = sorted_items[:, :k] + 1
-                        randomized_label = torch.rand(sorted_items.shape).to(self.device)
-                        randomized_label = randomized_label / randomized_label.sum(dim=-1).unsqueeze(-1)
-                        randomized_label, _ = torch.sort(randomized_label, dim=-1, descending=True)
+                        sorted_items_k = sorted_items[:, :k] + 1
                         
-                        selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
-                        row_indices = torch.arange(sorted_items.size(0))
-                        seqs = torch.cat((seqs, sorted_items[row_indices, selected_indices].unsqueeze(1)), 1)
+                        if gen_step != 1 and len(temp_seq[0]) != 0:
+                            pass
+                        elif agent is not None:
+                            sorted_items = []
+                            t_sorted_items_k = sorted_items_k.cpu().numpy()
+                            t_seqs = seqs.cpu().numpy()
+                            for w, items in enumerate(t_sorted_items_k):
+                                items_list = list(set(items) - set(t_seqs[w]))
+                                if len(items_list) == 0:
+                                    items_list = list(items)
+                                random.shuffle(items_list)
+                                sorted_items.append(items_list)
+                            sorted_items = torch.tensor(sorted_items)
+                            selected_indices = agent(sorted_items)
+                            randomized_label = torch.ones_like(sorted_items_k).to(self.device)
+                        else:
+                            sorted_items = sorted_items_k
+                            randomized_label = torch.rand(sorted_items.shape).to(self.device)
+                            randomized_label = randomized_label / randomized_label.sum(dim=-1).unsqueeze(-1)
+                            randomized_label, _ = torch.sort(randomized_label, dim=-1, descending=True)
+                            
+                            selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
+                        
+                        if gen_step != 1:
+                            if len(temp_seq[0]) == 0:
+                                row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items.size(0))])
+                                temp_seq = sorted_items[row_indices, selected_indices].to(self.device)
+                            seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
+                            temp_seq = temp_seq[:, 1:]
+                        else:
+                            row_indices = torch.arange(sorted_items.size(0))
+                            seqs = torch.cat((seqs, sorted_items[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
 
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
-                            candidates = torch.cat((candidates, sorted_items.unsqueeze(1)), 1)
+                            candidates = torch.cat((candidates, sorted_items_k.unsqueeze(1)), 1)
                         except:
                             logits = randomized_label.unsqueeze(1)
-                            candidates = sorted_items.unsqueeze(1)
+                            candidates = sorted_items_k.unsqueeze(1)
 
                     labels = self.bb_model(seqs.long())[:, -1, :]
                     _, sorted_items = torch.sort(labels[:, 1:], dim=-1, descending=True)
@@ -346,21 +375,48 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         labels = self.bb_model(seqs.long(), lengths)
 
                         _, sorted_items = torch.sort(labels[:, 1:], dim=-1, descending=True)
-                        sorted_items = sorted_items[:, :k] + 1
-                        randomized_label = torch.rand(sorted_items.shape).to(self.device)
-                        randomized_label = randomized_label / randomized_label.sum(dim=-1).unsqueeze(-1)
-                        randomized_label, _ = torch.sort(randomized_label, dim=-1, descending=True) 
+                        sorted_items_k = sorted_items[:, :k] + 1
+                        
+                        if gen_step != 1 and len(temp_seq[0]) != 0:
+                            pass
+                        elif agent is not None:
+                            sorted_items = []
+                            t_sorted_items_k = sorted_items_k.cpu().numpy()
+                            t_seqs = seqs.cpu().numpy()
+                            for w, items in enumerate(t_sorted_items_k):
+                                items_list = list(set(items) - set(t_seqs[w]))
+                                if len(items_list) == 0:
+                                    items_list = list(items)
+                                random.shuffle(items_list)
+                                sorted_items.append(items_list)
+                            sorted_items = torch.tensor(sorted_items)
+                            selected_indices = agent(sorted_items)
+                            randomized_label = torch.ones_like(sorted_items_k).to(self.device)
+                        else:
+                            sorted_items = sorted_items_k
+                            
+                            randomized_label = torch.rand(sorted_items.shape).to(self.device)
+                            randomized_label = randomized_label / randomized_label.sum(dim=-1).unsqueeze(-1)
+                            randomized_label, _ = torch.sort(randomized_label, dim=-1, descending=True) 
 
-                        selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
-                        row_indices = torch.arange(sorted_items.size(0))
-                        seqs = torch.cat((seqs, sorted_items[row_indices, selected_indices].unsqueeze(1)), 1)
+                            selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
+                        
+                        if gen_step != 1:
+                            if len(temp_seq[0]) == 0:
+                                row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items.size(0))])
+                                temp_seq = sorted_items[row_indices, selected_indices].to(self.device)
+                            seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
+                            temp_seq = temp_seq[:, 1:]
+                        else:
+                            row_indices = torch.arange(sorted_items.size(0))
+                            seqs = torch.cat((seqs, sorted_items[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
                         
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
-                            candidates = torch.cat((candidates, sorted_items.unsqueeze(1)), 1)
+                            candidates = torch.cat((candidates, sorted_items_k.unsqueeze(1)), 1)
                         except:
                             logits = randomized_label.unsqueeze(1)
-                            candidates = sorted_items.unsqueeze(1)
+                            candidates = sorted_items_k.unsqueeze(1)
 
                     lengths = torch.tensor([self.max_len] * seqs.size(0))
                     labels = self.bb_model(seqs.long(), lengths)
