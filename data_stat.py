@@ -4,7 +4,7 @@ from collections import Counter
 import matplotlib.pyplot as plt
 
 arch = 'narm'
-split=False
+split= False
 
 with open('data/preprocessed/ml-1m_text.pkl', 'rb') as f:
     text = pickle.load(f)
@@ -103,6 +103,7 @@ def fig():
     plt.title('Counts')
     plt.xlabel('genres')
     plt.ylabel('Count')
+    plt.legend() 
     plt.savefig(f'pics/data_top10_{arch}_split={split}.jpg')
     
 def cases():
