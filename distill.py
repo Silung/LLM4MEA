@@ -26,6 +26,8 @@ def distill(args, bb_model_root=None, export_root=None, resume=False):
         model = SASRec(args)
     elif args.model_code == 'narm':
         model = NARM(args)
+    elif args.model_code == 'gru':
+        model = GRU4REC(args)
     
     model_codes = {'b': 'bert', 's':'sas', 'n':'narm'}
     if args.bb_model_code is None:
@@ -39,6 +41,8 @@ def distill(args, bb_model_root=None, export_root=None, resume=False):
         bb_model = SASRec(args)
     elif args.bb_model_code == 'narm':
         bb_model = NARM(args)
+    elif args.bb_model_code == 'gru':
+        bb_model = GRU4REC(args)
     
     if bb_model_root == None:
         bb_model_root = 'experiments/' + args.bb_model_code + '/' + args.dataset_code
@@ -61,7 +65,7 @@ def distill(args, bb_model_root=None, export_root=None, resume=False):
             print('Failed to load old model, continue training new model...')
     trainer = NoDataRankDistillationTrainer(args, args.model_code, model, bb_model, test_loader, export_root, args.loss, last_epoch, last_accum_iter)
 
-    trainer.train_autoregressive()
+    trainer.train()
 
 
 if __name__ == "__main__":

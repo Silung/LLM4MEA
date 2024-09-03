@@ -57,7 +57,7 @@ class DistillationLoader():
         elif self.args.model_code == 'sas':
             train_dataset = SASDistillationTrainingDataset(self.args, self.tokens, self.logits, self.candidates)
             valid_dataset = SASDistillationValidationDataset(self.args, self.tokens, self.logits, self.candidates)
-        elif self.args.model_code == 'narm':
+        elif self.args.model_code in ['narm', 'gru'] :
             train_dataset = NARMDistillationTrainingDataset(self.args, self.tokens, self.logits, self.candidates)
             valid_dataset = NARMDistillationValidationDataset(self.args, self.tokens, self.logits, self.candidates)
             

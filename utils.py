@@ -28,6 +28,7 @@ def set_template(args, mode='train'):
         args.bert_dropout = 0.1
         args.bert_attn_dropout = 0.1
         args.bert_max_len = 200
+        # args.bert_max_len = 50
         args.bert_mask_prob = 0.2
         args.bert_max_predictions = 40
         args.margin_topk = 0.75
@@ -179,8 +180,8 @@ parser.add_argument('--loss', type=str, default='ranking', choices=['ranking', '
 ################
 # Model
 ################
-parser.add_argument('--model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm'])
-parser.add_argument('--bb_model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm'])
+parser.add_argument('--model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm','gru'])
+parser.add_argument('--bb_model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm','gru'])
 # BERT specs, used for SASRec and NARM as well #
 parser.add_argument('--bert_max_len', type=int, default=None)
 parser.add_argument('--bert_hidden_units', type=int, default=64)
@@ -195,7 +196,7 @@ parser.add_argument('--bert_mask_prob', type=float, default=0.2)
 # Distillation & Retraining
 ################
 parser.add_argument('--num_generated_seqs', type=int, default=3000)
-parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'llm_pfl', 'mix', 'llm_exam', 'llm_seq'])
+parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'llm_pfl', 'mix', 'llm_exam', 'llm_seq', 'llm_seq_test'])
 parser.add_argument('-k', type=int, default=100)
 parser.add_argument('--num_original_seqs', type=int, default=0)
 parser.add_argument('--num_poisoned_seqs', type=int, default=100)
@@ -221,6 +222,8 @@ parser.add_argument('--attack_mode', type=str, default='wb_grad', choices=['wb_g
 parser.add_argument('--id', type=str, default='')
 parser.add_argument('--port', type=int, default=1960)
 parser.add_argument('--shuffle', action="store_true")
+parser.add_argument('--gen_data_only', action="store_true")
+parser.add_argument('--completion', action="store_true")
 
 
 args = parser.parse_args()

@@ -26,6 +26,8 @@ def train(args, export_root=None, resume=False):
         model = SASRec(args)
     elif args.model_code == 'narm':
         model = NARM(args)
+    elif args.model_code == 'gru':
+        model = GRU4REC(args)
 
     if export_root == None:
         export_root = 'experiments/' + args.model_code + '/' + args.dataset_code
@@ -44,12 +46,13 @@ def train(args, export_root=None, resume=False):
 
     if args.model_code == 'bert':
         trainer = BERTTrainer(args, model, train_loader, val_loader, test_loader, export_root, start_epoch, last_accum_iter)
-    if args.model_code == 'sas':
+    elif args.model_code == 'sas':
         trainer = SASTrainer(args, model, train_loader, val_loader, test_loader, export_root, start_epoch, last_accum_iter)
     elif args.model_code == 'narm':
         args.num_epochs = 100
         trainer = RNNTrainer(args, model, train_loader, val_loader, test_loader, export_root, start_epoch, last_accum_iter)
-
+    elif args.model_code == 'gru':
+        trainer = GRUTrainer(args, model, train_loader, val_loader, test_loader, export_root, start_epoch, last_accum_iter)
     trainer.train()
     trainer.test()
 
