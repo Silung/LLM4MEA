@@ -224,6 +224,7 @@ parser.add_argument('--port', type=int, default=1960)
 parser.add_argument('--shuffle', action="store_true")
 parser.add_argument('--gen_data_only', action="store_true")
 parser.add_argument('--completion', action="store_true")
+parser.add_argument('--few_shot', action="store_true")
 
 
 args = parser.parse_args()

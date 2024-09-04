@@ -22,6 +22,7 @@ from abc import *
 from pathlib import Path
 
 from trainer.agent import *
+from datasets import dataset_factory
 
 class NoDataRankDistillationTrainer(metaclass=ABCMeta):
     def __init__(self, args, model_code, model, bb_model, test_loader, export_root, loss='ranking', last_epoch=0, last_accum_iter=0, tau=1., margin_topk=0.5, margin_neg=0.5):
@@ -215,6 +216,11 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
 
     def generate_data(self, k=100, batch_size=50):
         dataset = dis_dataset_factory(self.args, self.model_code, self.args.generated_sampler)
+        if self.args.few_shot:
+            org_dataset = dataset_factory(self.args)
+            org_dataset = org_dataset.load_dataset()
+            org_data = org_dataset['train']
+            org_data = np.concatenate([np.array(v) for v in org_data.values()])
         if dataset.check_data_present():
             print('Dataset already exists. Skip generation')
             return
@@ -248,7 +254,10 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     # 生成一个从1到self.num_items的随机排列
                     random_tokens[idx] = np.random.permutation(np.arange(self.num_items))[:self.max_len] + 1
                 random_tokens = torch.tensor(random_tokens)
-            seqs = torch.randint(1, self.num_items + 1, (batch_size, 1)).to(self.device)
+            if self.args.few_shot:
+                seqs = torch.tensor(np.random.choice(org_data, batch_size, replace=True)).reshape(batch_size, 1).to(self.device)
+            else:
+                seqs = torch.randint(1, self.num_items + 1, (batch_size, 1)).to(self.device)
             # print(f'first item: {seqs[0]}')
             logits = None
             candidates = None

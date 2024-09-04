@@ -41,12 +41,10 @@ class Agent():
             self.history = None
         
         if self.dataset_code == 'ml-1m':
-            self.his_size = 50
-            self.seq_size = 10
-            self.his_size = 50
+            self.his_size = 20
             self.seq_size = 10
         elif self.dataset_code == 'steam':
-            self.his_size = 15
+            self.his_size = 20
             self.seq_size = 5
         else:
             self.his_size = 10

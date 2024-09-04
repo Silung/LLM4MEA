@@ -1,8 +1,8 @@
 import os
 import pickle
 
-root = 'gen_data/steam/narm_1000_100'
-paths = [f'llm_seq{i}_dataset.pkl' for i in range(10,15)]
+root = 'gen_data/steam/narm_2500_100'
+paths = [f'llm_seq{i}_dataset.pkl' for i in range(2)]
 print(paths)
 datasets = []
 for path in paths:
