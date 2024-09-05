@@ -81,6 +81,10 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         elif self.loss == 'kl+ct':
             self.loss_func_1 = nn.KLDivLoss(reduction='batchmean')
             self.loss_func_2 = nn.CrossEntropyLoss(ignore_index=0)
+        elif self.loss == 'kl+ranking':
+            self.loss_func_1 = nn.KLDivLoss(reduction='batchmean')
+            self.loss_func_2 = nn.MarginRankingLoss(margin=self.margin_topk)
+            self.loss_func_3 = nn.MarginRankingLoss(margin=self.margin_neg)
 
     def calculate_loss(self, seqs, labels, candidates, lengths=None):
         if isinstance(self.model, BERT) or isinstance(self.model, SASRec):
@@ -106,6 +110,24 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             logits_2 = logits[:, 1:].reshape(-1)
             loss = self.loss_func_1(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
             loss += self.loss_func_2(logits, neg_logits, torch.ones(logits.shape).to(self.device))
+            
+        elif self.loss == 'kl+ranking':
+            weight = torch.ones_like(logits).to(self.device)
+            # logits = F.softmax(logits/self.tau, dim=-1)
+            weight[torch.arange(weight.size(0)).unsqueeze(1), candidates] = 0
+            neg_samples = torch.distributions.Categorical(F.softmax(weight, -1)).sample_n(candidates.size(-1)).permute(1, 0)
+            # assume candidates are in descending order w.r.t. true label
+            neg_logits = torch.gather(logits, -1, neg_samples)
+            logits = torch.gather(logits, -1, candidates)
+            logits_1 = logits[:, :-1].reshape(-1)
+            logits_2 = logits[:, 1:].reshape(-1)
+            loss = self.loss_func_2(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
+            loss += self.loss_func_3(logits, neg_logits, torch.ones(logits.shape).to(self.device))
+            
+            # KL
+            logits = logits.view(-1, logits.size(-1))
+            labels = labels.view(-1, labels.size(-1))
+            loss += 1e3 * self.loss_func_1(F.log_softmax(logits/self.tau, dim=-1), F.softmax(labels/self.tau, dim=-1))
         
         elif self.loss == 'myranking':
             weight = torch.ones_like(logits).to(self.device)
