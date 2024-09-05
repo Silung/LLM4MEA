@@ -543,6 +543,10 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                 loss = self.calculate_loss(seqs, labels, candidates)
             elif isinstance(self.model, NARM) or isinstance(self.model, GRU4REC):
                 seqs, lengths, candidates, labels = batch
+                if self.args.noise:
+                    noise_p = torch.rand(seqs.shape)
+                    seqs_noise = torch.randint_like(seqs, 1, self.args.num_items + 1)
+                    seqs = torch.where(noise_p < 0.1, seqs_noise, seqs)
                 lengths = lengths.flatten()
                 seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
                 loss = self.calculate_loss(seqs, labels, candidates, lengths=lengths)

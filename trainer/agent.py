@@ -196,8 +196,12 @@ class Agent():
         except:
             sorted_items = sorted_items.numpy()
         query = self.encode(sorted_items)
-        # print(query[0])
         received_data = self.send_rev(query)
+        if self.args.debug:
+            print('LLM input and output:')
+            print(query[0])
+            print(received_data[0])
+            print()
         selected_indices = self.decode(received_data)
         # shape: [B], index start with 1.
         # print(selected_indices[0])
@@ -272,9 +276,13 @@ class SeqAgent(Agent):
                 # last update
                 # output = [[{"role":"system", "content":"You are a user of the Steam, a video game digital distribution service and storefront, and want to purchase your next game."}, 
                 #             {"role": "user", "content": f"I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list (i.e. ['a', 'b', 'c']). Make sure only answer the title without other words! Note that one user only accesses a few specific categories of items."}] for text in texts]
-                output = [[{"role":"system", "content":"You are a user on Steam, a digital distribution service for video games, looking to purchase your next game."},
-                            {"role": "user", "content": f"Based on your gaming preferences and past interactions, I have a list of game candidates for you: {text}. Popular game genres include Action, Adventure, Role-Playing (RPG), Strategy, Simulation, and Sports. Please select {self.seq_size} games from this list that you would consider purchasing next, focusing on the genres you usually enjoy. However, keep in mind that users sometimes explore games outside of their typical preferences. Return only the selected game titles in a Python list format (e.g., ['title1', 'title2', 'title3']). Make sure to respond with only the titles and nothing else!"}] for text in texts]
+                # output = [[{"role":"system", "content":"You are a user on Steam, a digital distribution service for video games, looking to purchase your next game."},
+                #             {"role": "user", "content": f"Based on your gaming preferences and past interactions, I have a list of game candidates for you: {text}. Popular game genres include Action, Adventure, Role-Playing (RPG), Strategy, Simulation, and Sports. Please select {self.seq_size} games from this list that you would consider purchasing next, focusing on the genres you usually enjoy. However, keep in mind that users sometimes explore games outside of their typical preferences. Return only the selected game titles in a Python list format (e.g., ['title1', 'title2', 'title3']). Make sure to respond with only the titles and nothing else!"}] for text in texts]
                 # output = [[{"role": "user", "content": f"You are a user with your own preference. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure only answer the title without other words! "}] for text in texts]
+                
+                #dislike
+                output = [[{"role":"system", "content":"You are a user on Steam, a digital distribution service for video games."},
+                            {"role": "user", "content": f"Based on your gaming preferences and past interactions, I have a list of game candidates for you: {text}. Please select {self.seq_size} games from this list that you are least likely to purchase, avoiding the types of games you usually enjoy. Return only the selected game titles in a Python list format (e.g., ['title1', 'title2', 'title3']). Make sure to respond with only the titles and nothing else!"}] for text in texts]
         else:
             output = []
             for i, text in enumerate(texts):
@@ -292,11 +300,13 @@ class SeqAgent(Agent):
                     # last update 
                     # output.append([{"role":"system", "content":"You are a user of the Steam, a video game digital distribution service and storefront, and want to purchase your next game."}, 
                     #                {"role": "user", "content": f"You have bought {ex_items}. I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list (i.e. ['a', 'b', 'c']). Make sure only answer the title without other words! Note that one user only accesses a few specific categories of items, and please follow the preferences reflected in history."}])
-                    output.append([{"role": "system", "content": "You are a user on Steam, a digital distribution service for video games, looking to purchase your next game."},
-                                    {"role": "user", "content": f"You have previously purchased the following games: {ex_items}. Based on your purchase history, I have a list of additional game recommendations for you: {text}. Please select {self.seq_size} games from this list that match your interests, and provide the titles in the order you would buy them, formatted as a Python list (e.g., ['title1', 'title2', 'title3']). Only respond with the list of titles, without any extra text! While users often stick to specific categories, they sometimes explore games outside their typical preferences, so consider this when making your selections."}])
-                    
+                    # output.append([{"role": "system", "content": "You are a user on Steam, a digital distribution service for video games, looking to purchase your next game."},
+                    #                 {"role": "user", "content": f"You have previously purchased the following games: {ex_items}. Based on your purchase history, I have a list of additional game recommendations for you: {text}. Please select {self.seq_size} games from this list that match your interests, and provide the titles in the order you would buy them, formatted as a Python list (e.g., ['title1', 'title2', 'title3']). Only respond with the list of titles, without any extra text! While users often stick to specific categories, they sometimes explore games outside their typical preferences, so consider this when making your selections."}])
                     # output.append([{"role": "user", "content": f"You are a user with your own preference, and you have bought {ex_items}. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure not to choose items you have bought and only answer the title without other words! "}])
-
+                    
+                    #dislike
+                    output.append([{"role": "system", "content": "You are a user on Steam, a digital distribution service for video games."},
+                                    {"role": "user", "content": f"You have previously purchased the following games: {ex_items}. Based on your purchase history, I have a list of additional game recommendations for you: {text}. Please select {self.seq_size} games from this list that you are least likely to purchase, avoiding the types of games that match your usual preferences. Provide the titles formatted as a Python list (e.g., ['title1', 'title2', 'title3']). Only respond with the list of titles, without any extra text!"}])
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]
         if self.watched_items is None:
