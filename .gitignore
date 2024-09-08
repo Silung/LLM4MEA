@@ -14,9 +14,11 @@ temp_*
 /.ipynb_checkpoints/*
 /.vscode/*
 /experiments/*
+/experiments.old/*
 
 /data/*
 /gen_data/*
+/gen_data.old/*
 
 /指导记录
 /答辩材料

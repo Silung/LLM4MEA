@@ -1,11 +1,11 @@
 import os
 import json
 
-a1 = ['gru', 'sas', 'bert']
+a1 = ['narm', 'sas', 'bert']
 a2 = ['ml-1m', 'steam', 'beauty']
 a3 = ['NDCG@10', 'Recall@10', 'Agr@1', 'Agr@10']
 a4 = ['target', 'random', 'autoregressive', 'llm_seq']
-a1map = {'gru':'GRU4Rec', 'sas':'SASRec', 'bert':'BERT'}
+a1map = {'narm':'NARM', 'sas':'SASRec', 'bert':'BERT'}
 a4map = {'target':'Target', 'random':'Random', 'autoregressive':'DFME', 'llm_seq':'Ours'}
 
 # for i in a3[:2]:

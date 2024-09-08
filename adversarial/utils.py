@@ -12,6 +12,8 @@ import torch
 import torch.backends.cudnn as cudnn
 from torch import optim as optim
 
+import time
+
 
 def recall(scores, labels, k):
     scores = scores
@@ -108,13 +110,13 @@ def load_weights(model, path):
 
 
 def save_test_result(export_root, result):
-    filepath = Path(export_root).joinpath('test_result.txt')
+    filepath = Path(export_root).joinpath(f'test_result_{int(time.time())}.txt')
     with filepath.open('w') as f:
         json.dump(result, f, indent=2)
 
 
 def export_experiments_config_as_json(args, experiment_path):
-    with open(os.path.join(experiment_path, 'config.json'), 'w') as outfile:
+    with open(os.path.join(experiment_path, f'config_{int(time.time())}.json'), 'w') as outfile:
         json.dump(vars(args), outfile, indent=2)
 
 

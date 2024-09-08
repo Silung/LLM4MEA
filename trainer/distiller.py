@@ -23,6 +23,7 @@ from pathlib import Path
 
 from trainer.agent import *
 from datasets import dataset_factory
+import time
 
 class NoDataRankDistillationTrainer(metaclass=ABCMeta):
     def __init__(self, args, model_code, model, bb_model, test_loader, export_root, loss='ranking', last_epoch=0, last_accum_iter=0, tau=1., margin_topk=0.5, margin_neg=0.5):
@@ -112,22 +113,24 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             loss += self.loss_func_2(logits, neg_logits, torch.ones(logits.shape).to(self.device))
             
         elif self.loss == 'kl+ranking':
-            weight = torch.ones_like(logits).to(self.device)
-            # logits = F.softmax(logits/self.tau, dim=-1)
-            weight[torch.arange(weight.size(0)).unsqueeze(1), candidates] = 0
-            neg_samples = torch.distributions.Categorical(F.softmax(weight, -1)).sample_n(candidates.size(-1)).permute(1, 0)
-            # assume candidates are in descending order w.r.t. true label
-            neg_logits = torch.gather(logits, -1, neg_samples)
-            logits = torch.gather(logits, -1, candidates)
-            logits_1 = logits[:, :-1].reshape(-1)
-            logits_2 = logits[:, 1:].reshape(-1)
-            loss = self.loss_func_2(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
-            loss += self.loss_func_3(logits, neg_logits, torch.ones(logits.shape).to(self.device))
-            
-            # KL
-            logits = logits.view(-1, logits.size(-1))
-            labels = labels.view(-1, labels.size(-1))
-            loss += 1e3 * self.loss_func_1(F.log_softmax(logits/self.tau, dim=-1), F.softmax(labels/self.tau, dim=-1))
+            if self.epoch > 20:
+                weight = torch.ones_like(logits).to(self.device)
+                # logits = F.softmax(logits/self.tau, dim=-1)
+                weight[torch.arange(weight.size(0)).unsqueeze(1), candidates] = 0
+                neg_samples = torch.distributions.Categorical(F.softmax(weight, -1)).sample_n(candidates.size(-1)).permute(1, 0)
+                # assume candidates are in descending order w.r.t. true label
+                neg_logits = torch.gather(logits, -1, neg_samples)
+                logits = torch.gather(logits, -1, candidates)
+                logits_1 = logits[:, :-1].reshape(-1)
+                logits_2 = logits[:, 1:].reshape(-1)
+                loss = self.loss_func_2(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
+                loss += self.loss_func_3(logits, neg_logits, torch.ones(logits.shape).to(self.device))
+            else:
+                # KL
+                logits = torch.gather(logits, -1, candidates)
+                logits = logits.view(-1, logits.size(-1))
+                labels = labels.view(-1, labels.size(-1))
+                loss = self.loss_func_1(F.log_softmax(logits/self.tau, dim=-1), F.softmax(labels/self.tau, dim=-1))
         
         elif self.loss == 'myranking':
             weight = torch.ones_like(logits).to(self.device)
@@ -271,11 +274,12 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             if agent is not None:
                 agent.clear()
             elif self.args.generated_sampler == 'random':
-                random_tokens = np.zeros((batch_size, self.max_len), dtype=int)
-                for idx in range(batch_size):
-                    # 生成一个从1到self.num_items的随机排列
-                    random_tokens[idx] = np.random.permutation(np.arange(self.num_items))[:self.max_len] + 1
-                random_tokens = torch.tensor(random_tokens)
+                # random_tokens = np.zeros((batch_size, self.max_len), dtype=int)
+                # for idx in range(batch_size):
+                #     # 生成一个从1到self.num_items的随机排列
+                #     random_tokens[idx] = np.random.permutation(np.arange(self.num_items))[:self.max_len] + 1
+                # random_tokens = torch.tensor(random_tokens)
+                random_tokens = torch.randint(low=1, high=self.num_items+1, size=(batch_size, self.max_len), dtype=torch.int)
             if self.args.few_shot:
                 seqs = torch.tensor(np.random.choice(org_data, batch_size, replace=True)).reshape(batch_size, 1).to(self.device)
             else:
@@ -552,6 +556,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         return metrics
 
     def train_one_epoch(self, epoch, accum_iter, train_loader, val_loader, stage=0):
+        self.epoch = epoch
         self.model.train()
         self.bb_model.train()
         average_meter_set = AverageMeterSet()
@@ -632,7 +637,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     tqdm_dataloader, average_meter_set)
 
             average_metrics = average_meter_set.averages()
-            with open(os.path.join(self.export_root, 'logs', 'test_metrics.json'), 'w') as f:
+            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{int(time.time())}.json'), 'w') as f:
                 json.dump(average_metrics, f, indent=4)
         
         return average_metrics
@@ -660,7 +665,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     tqdm_dataloader, average_meter_set)
 
             average_metrics = average_meter_set.averages()
-            with open(os.path.join(self.export_root, 'logs', 'test_metrics.json'), 'w') as f:
+            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{int(time.time())}.json'), 'w') as f:
                 json.dump(average_metrics, f, indent=4)
         
         return average_metrics

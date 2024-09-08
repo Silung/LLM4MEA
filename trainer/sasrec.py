@@ -16,6 +16,8 @@ import numpy as np
 from abc import *
 from pathlib import Path
 
+import time
+
 
 class SASTrainer(metaclass=ABCMeta):
     def __init__(self, args, model, train_loader, val_loader, test_loader, export_root, last_epoch=0, last_accum_iter=0):
@@ -150,7 +152,7 @@ class SASTrainer(metaclass=ABCMeta):
                     tqdm_dataloader, average_meter_set)
 
             average_metrics = average_meter_set.averages()
-            with open(os.path.join(self.export_root, 'logs', 'test_metrics.json'), 'w') as f:
+            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{int(time.time())}.json'), 'w') as f:
                 json.dump(average_metrics, f, indent=4)
         
         return average_metrics

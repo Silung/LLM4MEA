@@ -12,6 +12,8 @@ import copy
 from pathlib import Path
 from collections import defaultdict
 
+import time
+
 try:
     import torch_directml
 except:
@@ -113,7 +115,7 @@ def retrain(args, bb_model_root=None):
         if not Path(metrics_root).is_dir():
             Path(metrics_root).mkdir(parents=True)
 
-        with open(os.path.join(metrics_root, 'retrained_bb_metrics.json'), 'w') as f:
+        with open(os.path.join(metrics_root, f'retrained_bb_metrics_{int(time.time())}.json'), 'w') as f:
             json.dump(bb_poisoned_metrics, f, indent=4)
 
 
