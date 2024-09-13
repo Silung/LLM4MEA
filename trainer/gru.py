@@ -138,7 +138,7 @@ class GRUTrainer(metaclass=ABCMeta):
 
     def test(self):
         best_model_dict = torch.load(os.path.join(
-            self.export_root, 'models', 'best_acc_model.pth')).get(STATE_DICT_KEY)
+            self.export_root, 'models', f'best_acc{self.args.id}_model.pth')).get(STATE_DICT_KEY)
         self.model.load_state_dict(best_model_dict)
         self.model.eval()
         average_meter_set = AverageMeterSet()
@@ -239,9 +239,9 @@ class GRUTrainer(metaclass=ABCMeta):
                 MetricGraphPrinter(writer, key='NDCG@%d' % k, graph_name='NDCG@%d' % k, group_name='Validation'))
             val_loggers.append(
                 MetricGraphPrinter(writer, key='Recall@%d' % k, graph_name='Recall@%d' % k, group_name='Validation'))
-        val_loggers.append(RecentModelLogger(model_checkpoint))
+        val_loggers.append(RecentModelLogger(model_checkpoint, f'checkpoint-recent{self.args.id}.pth'))
         val_loggers.append(BestModelLogger(
-            model_checkpoint, metric_key=self.best_metric))
+            model_checkpoint, metric_key=self.best_metric, filename=f'best_acc{self.args.id}_model.pth'))
         return writer, train_loggers, val_loggers
 
     def _create_state_dict(self):

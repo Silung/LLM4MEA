@@ -57,7 +57,7 @@ def distill(args, bb_model_root=None, export_root=None, resume=False):
     if resume:
         try:
             # model.load_state_dict(torch.load(os.path.join(export_root, 'models', 'best_acc_model.pth'), map_location='cpu').get(STATE_DICT_KEY))
-            state_dict = torch.load(os.path.join(export_root, 'models', 'checkpoint-recent.pth'), map_location='cpu')
+            state_dict = torch.load(os.path.join(export_root, 'models', f'checkpoint-recent{args.id}.pth'), map_location='cpu')
             model.load_state_dict(state_dict.get(STATE_DICT_KEY))
             last_epoch = state_dict.get(EPOCH_STATE_DICT_KEY)
             last_accum_iter = state_dict.get(ACC_ITER_STATE_DICT_KEY)

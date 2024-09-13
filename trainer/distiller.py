@@ -544,7 +544,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         # self.validate(dis_val_loader, 0, accum_iter)
         for epoch in range(self.last_epoch, self.num_epochs):
             accum_iter = self.train_one_epoch(epoch, accum_iter, dis_train_loader, dis_val_loader, stage=1)
-            if epoch != 0 and epoch % 10 == 0:
+            if self.args.debug and epoch != 0 and epoch % 10 == 0:
                 print(self.test())
         metrics = self.test()
         
@@ -558,7 +558,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
     def train_one_epoch(self, epoch, accum_iter, train_loader, val_loader, stage=0):
         self.epoch = epoch
         self.model.train()
-        self.bb_model.train()
+        self.bb_model.eval()
         average_meter_set = AverageMeterSet()
         
         tqdm_dataloader = tqdm(train_loader)
@@ -622,7 +622,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
 
     def test(self):
         wb_model = torch.load(os.path.join(
-            self.export_root, 'models', 'best_acc_model.pth')).get(STATE_DICT_KEY)
+            self.export_root, 'models', f'best_acc{self.args.id}_model.pth')).get(STATE_DICT_KEY)
         self.model.load_state_dict(wb_model)
         
         self.model.eval()
@@ -751,9 +751,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                 MetricGraphPrinter(writer, key='NDCG@%d' % k, graph_name='NDCG@%d' % k, group_name='Validation'))
             val_loggers.append(
                 MetricGraphPrinter(writer, key='Recall@%d' % k, graph_name='Recall@%d' % k, group_name='Validation'))
-        val_loggers.append(RecentModelLogger(model_checkpoint))
+        val_loggers.append(RecentModelLogger(model_checkpoint, f'checkpoint-recent{self.args.id}.pth'))
         val_loggers.append(BestModelLogger(
-            model_checkpoint, metric_key=self.best_metric))
+            model_checkpoint, metric_key=self.best_metric, filename=f'best_acc{self.args.id}_model.pth'))
         return writer, train_loggers, val_loggers
 
     def _create_state_dict(self):
