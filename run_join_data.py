@@ -18,8 +18,8 @@ dis_gpu = [3]  # 可用显卡
 seqs_per_proc = 500
 id_start = 0
 num_p = 50 - id_start
-arch = 'sas'
-dataset_name = 'steam'
+arch = 'bert'
+dataset_name = 'beauty'
 total_seqs = seqs_per_proc * num_p    # num_generated_seqs的总和
 
 step = 10
@@ -33,9 +33,13 @@ for idx in range(num_p // step):
     paths = [f'llm_seq{i}_dataset.pkl' for i in range(idx * step , (idx + 1) * step)]
     print(paths)
     datasets = []
-    for path in paths:
-        with open(os.path.join(root, path), 'rb') as f:
-            datasets.append(pickle.load(f))
+    try:
+        for path in paths:
+            with open(os.path.join(root, path), 'rb') as f:
+                datasets.append(pickle.load(f))
+    except:
+        print('缺少文件')
+        continue
         
     seqs, logits, candidates = [], [], []
     for dataset in datasets:

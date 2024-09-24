@@ -37,7 +37,13 @@ class DistillationLoader():
         self.tokens = dataset['seqs']
         self.logits = dataset['logits']
         self.candidates = dataset['candidates']
-
+        try:
+            self.gts = dataset['gts']
+            if len(self.gts) == 0:
+                self.gts = None
+        except:
+            self.gts = None
+            
     @classmethod
     def code(cls):
         return 'distillation_loader'
@@ -52,20 +58,20 @@ class DistillationLoader():
 
     def _get_datasets(self):
         if self.args.model_code == 'bert':
-            train_dataset = BERTDistillationTrainingDataset(self.args, self.tokens, self.logits, self.candidates)
+            train_dataset = BERTDistillationTrainingDataset(self.args, self.tokens, self.logits, self.candidates, self.gts)
             valid_dataset = BERTDistillationValidationDataset(self.args, self.tokens, self.logits, self.candidates)
         elif self.args.model_code == 'sas':
-            train_dataset = SASDistillationTrainingDataset(self.args, self.tokens, self.logits, self.candidates)
+            train_dataset = SASDistillationTrainingDataset(self.args, self.tokens, self.logits, self.candidates, self.gts)
             valid_dataset = SASDistillationValidationDataset(self.args, self.tokens, self.logits, self.candidates)
         elif self.args.model_code in ['narm', 'gru'] :
-            train_dataset = NARMDistillationTrainingDataset(self.args, self.tokens, self.logits, self.candidates)
+            train_dataset = NARMDistillationTrainingDataset(self.args, self.tokens, self.logits, self.candidates, self.gts)
             valid_dataset = NARMDistillationValidationDataset(self.args, self.tokens, self.logits, self.candidates)
             
         return train_dataset, valid_dataset
 
 
 class BERTDistillationTrainingDataset(data_utils.Dataset):
-    def __init__(self, args, tokens, labels, candidates):
+    def __init__(self, args, tokens, labels, candidates, gts):
         self.max_len = args.bert_max_len
         self.mask_prob = args.bert_mask_prob
         self.max_predictions = args.bert_max_predictions
@@ -75,18 +81,26 @@ class BERTDistillationTrainingDataset(data_utils.Dataset):
         self.all_seqs = []
         self.all_labels = []
         self.all_candidates = []
+        self.all_gts = []
         for i in range(len(tokens)):
             seq = tokens[i]
             label = labels[i]
             candidate = candidates[i]
+            if gts is not None:
+                gt = gts[i]
 
             for j in range(0, len(seq)-1):
                 masked_seq = seq[:j+1] + [self.mask_token]
                 self.all_seqs += [masked_seq]
                 self.all_labels += [label[j]]
                 self.all_candidates += [candidate[j]]
-
-        assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
+                if gts is not None:
+                    self.all_gts += [[gt[j]]]
+        
+        if len(self.all_gts) > 0:
+            assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates) == len(self.all_gts)
+        else:
+            assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
 
     def __len__(self):
         return len(self.all_seqs)
@@ -97,8 +111,10 @@ class BERTDistillationTrainingDataset(data_utils.Dataset):
         mask_len = self.max_len - len(masked_seq)
         masked_seq = [0] * mask_len + masked_seq
 
-        return torch.LongTensor(masked_seq), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index])
-
+        if len(self.all_gts) > 0:
+            return torch.LongTensor(masked_seq), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index]), torch.LongTensor(self.all_gts[index])
+        else:
+            return torch.LongTensor(masked_seq), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index]), torch.LongTensor([])
 
 class BERTDistillationValidationDataset(data_utils.Dataset):
     def __init__(self, args, tokens, labels, candidates):
@@ -134,22 +150,29 @@ class BERTDistillationValidationDataset(data_utils.Dataset):
 
 
 class SASDistillationTrainingDataset(data_utils.Dataset):
-    def __init__(self, args, tokens, labels, candidates):
+    def __init__(self, args, tokens, labels, candidates, gts):
         self.max_len = args.bert_max_len
         self.all_seqs = []
         self.all_labels = []
         self.all_candidates = []
+        self.all_gts = []
         for i in range(len(tokens)):
             seq = tokens[i]
             label = labels[i]
             candidate = candidates[i]
+            if gts is not None:
+                gt = gts[i]
             
             for j in range(1, len(seq)):
                 self.all_seqs += [seq[:-j]]
                 self.all_labels += [label[-j-1]]
                 self.all_candidates += [candidate[-j-1]]
-
-        assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
+                if gts is not None:
+                    self.all_gts += [[gt[-j-1]]]
+        if len(self.all_gts) > 0:
+            assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates) == len(self.all_gts)
+        else:
+            assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
 
     def __len__(self):
         return len(self.all_seqs)
@@ -159,8 +182,10 @@ class SASDistillationTrainingDataset(data_utils.Dataset):
         mask_len = self.max_len - len(tokens)
         tokens = [0] * mask_len + tokens
 
-        return torch.LongTensor(tokens), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index])
-
+        if len(self.all_gts) > 0:
+            return torch.LongTensor(tokens), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index]), torch.tensor(self.all_gts[index])
+        else:
+            return torch.LongTensor(tokens), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index]), torch.LongTensor([])
 
 class SASDistillationValidationDataset(data_utils.Dataset):
     def __init__(self, args, tokens, labels, candidates):
@@ -191,22 +216,29 @@ class SASDistillationValidationDataset(data_utils.Dataset):
 
 
 class NARMDistillationTrainingDataset(data_utils.Dataset):
-    def __init__(self, args, tokens, labels, candidates):
+    def __init__(self, args, tokens, labels, candidates, gts):
         self.max_len = args.bert_max_len
         self.all_seqs = []
         self.all_labels = []
         self.all_candidates = []
+        self.all_gts = []
         for i in range(len(tokens)):
             seq = tokens[i]
             label = labels[i]
             candidate = candidates[i]
-            
+            if gts is not None:
+                gt = gts[i]
+
             for j in range(1, len(seq)):
                 self.all_seqs += [seq[:-j]]
                 self.all_labels += [label[-j-1]]
                 self.all_candidates += [candidate[-j-1]]
-
-        assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
+                if gts is not None:
+                    self.all_gts += [[gt[-j-1]]]
+        if len(self.all_gts) > 0:
+            assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates) == len(self.all_gts)
+        else:
+            assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
 
     def __len__(self):
         return len(self.all_seqs)
@@ -216,8 +248,10 @@ class NARMDistillationTrainingDataset(data_utils.Dataset):
         length = len(tokens)
         tokens = tokens + [0] * (self.max_len - length)
 
-        return torch.LongTensor(tokens), torch.LongTensor([length]), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index])
-
+        if len(self.all_gts) > 0:
+            return torch.LongTensor(tokens), torch.LongTensor([length]), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index]), torch.tensor(self.all_gts[index])
+        else:
+            return torch.LongTensor(tokens), torch.LongTensor([length]), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index]), torch.LongTensor([])
 
 class NARMDistillationValidationDataset(data_utils.Dataset):
     def __init__(self, args, tokens, labels, candidates):
@@ -245,5 +279,3 @@ class NARMDistillationValidationDataset(data_utils.Dataset):
         tokens = tokens + [0] * (self.max_len - length)
 
         return torch.LongTensor(tokens), torch.LongTensor([length]), torch.LongTensor(self.all_candidates[index]), torch.tensor(self.all_labels[index])
-
-

@@ -1,12 +1,13 @@
 import os
 import json
+import numpy as np
 
 a1 = ['narm', 'sas', 'bert']
 a2 = ['ml-1m', 'steam', 'beauty']
 a3 = ['NDCG@10', 'Recall@10', 'Agr@1', 'Agr@10']
-a4 = ['target', 'random', 'autoregressive', 'llm_seq']
+a4 = ['target', 'self', 'random', 'autoregressive', 'llm_seq']
 a1map = {'narm':'NARM', 'sas':'SASRec', 'bert':'BERT'}
-a4map = {'target':'Target', 'random':'Random', 'autoregressive':'DFME', 'llm_seq':'Ours'}
+a4map = {'target':'Target', 'self':'Secret', 'random':'Random', 'autoregressive':'DFME', 'llm_seq':'Ours'}
 
 # for i in a3[:2]:
 #     for j in a2:
@@ -28,7 +29,7 @@ r = r"""\begin{tabular}{lccccccccccccc}
 
 cc = 0
 for i in a1:
-    r += f'\\multirow{len(a4)}{{*}}{{{a1map[i]}}} '
+    r += f'\\multirow{{{len(a4)}}}{{*}}{{{a1map[i]}}} '
     for w in a4:
         cc += 1
         r += f'& {a4map[w]} '
@@ -36,7 +37,12 @@ for i in a1:
             for k in a3:
                 try:
                     if w == 'target':
-                        f = open(os.path.join('experiments', i, j, 'logs', 'test_metrics.json'), 'r')
+                        path = os.path.join('experiments', i, j, 'logs')
+                        files = [f for f in os.listdir(path) if f.startswith('test_metrics_') and f.endswith('.json')]
+                        if len(files) != 1:
+                            pass
+                        else:
+                            f = open(os.path.join(path, files[0]), 'r')
                         json_str = "".join(f.readlines())
                         data = json.loads(json_str)
                         if k in data:
@@ -44,11 +50,22 @@ for i in a1:
                         else:
                             r += f" & - "
                     else:
-                        f = open(os.path.join('experiments', 'distillation_rank', f'{i}2{i}_{w}100ranking5000', j, 'logs', 'test_metrics.json'), 'r')    
-                        json_str = "".join(f.readlines())
-                        data = json.loads(json_str)
+                        path = os.path.join('experiments', 'distillation_rank', f'{i}2{i}_{w}100ranking5000', j, 'logs')
+                        files = [f for f in os.listdir(path) if f.startswith('test_metrics_') and f.endswith('.json')]
+
+                        metrics = []
+                        for file in files:
+                            with open(os.path.join(path, file), 'r') as f:
+                                data = json.load(f)
+                                metrics.append(data[k])
+                        # print(len(metrics))
+                        metrics = np.array(metrics)
+
+                        # f = open(os.path.join('experiments', 'distillation_rank', f'{i}2{i}_{w}100ranking5000', j, 'logs', 'test_metrics.json'), 'r')    
+                        # json_str = "".join(f.readlines())
+                        # data = json.loads(json_str)
                         # print(f"{i}: \t{data[i]}\t", end='')
-                        r += f" & {data[k]:.4f}"
+                        r += f" & {np.mean(metrics):.4f}$\pm${np.std(metrics):.4f}"
                 except:
                     # print(os.path.join('experiments', 'distillation_rank', f'{i}2{i}_{w}100ranking5000', j, 'logs', 'test_metrics.json'))
                     r += f" &  "

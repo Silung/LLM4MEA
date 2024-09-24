@@ -107,10 +107,10 @@ def fig():
     plt.savefig(f'pics/data_top10_{arch}_split={split}.jpg')
     
 def cases():
-    _, s1 = stat(f'gen_data/ml-1m/narm_5000_100/llm_seq_dataset.pkl')
-    _, s2 = stat(f'gen_data/ml-1m/bert_5000_100/llm_seq_dataset.pkl')
-    print('bert\n'+s2)
-    print('narm\n'+s1)
+    _, s1 = stat(f'gen_data/ml-1m/bert_5000_100/self0_dataset.pkl', idxs=[23])
+    _, s2 = stat(f'gen_data/ml-1m/bert_5000_100/llm_seq0_dataset.pkl', idxs=[23])
+    print('self\n'+s2)
+    print('llm\n'+s1)
     
-# cases()
-fig()
+cases()
+# fig()

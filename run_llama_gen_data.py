@@ -2,7 +2,7 @@ import os
 import subprocess
 import time
 import pickle
-
+import random
 
 
 # plan:
@@ -17,22 +17,22 @@ import pickle
 # narm beauty
 
 # 配置
-gpus = [3,4]  # 可用显卡列表
-dis_gpu = 3  # 可用显卡
+gpus = [5,7]  # 可用显卡列表
 # total_seqs = 25000    # num_generated_seqs的总和
 seqs_per_proc = 500
-id_start = 12
+id_start = 3
 num_p = 50 - id_start
-arch = 'bert'
-dataset_name = 'beauty'
+arch = 'sas'
+dataset_name = 'ml-1m'
 
 # llama_port_start = 1965
 # distill_port_start = 2000
 # master_port_start = 19605
 
-llama_port_start = 3965
-distill_port_start = 3000
-master_port_start = 39605
+random_port = random.randint(0,1000)
+llama_port_start = 3965 + random_port
+distill_port_start = 3000 + random_port
+master_port_start = 39605 + random_port
 
 # llama 和 distill 程序路径
 llama_dir = "/data/zhaoshilong/llama3"
@@ -57,7 +57,7 @@ for i, gpu in enumerate(gpus):
     p = subprocess.Popen(cmd, shell=True, cwd=llama_dir)
     # processes.append(p)
     time.sleep(1)
-time.sleep(10)  # 给每个程序一些时间来启动
+time.sleep(60)  # 给每个程序一些时间来启动
 
 for j in range(num_p // len(gpus)):
     # 记录所有子进程
@@ -66,7 +66,7 @@ for j in range(num_p // len(gpus)):
     for i, gpu in enumerate(gpus):
         if j * len(gpus) + i < num_p:
             print(f'pid={j * len(gpus) + i}')
-            os.environ['CUDA_VISIBLE_DEVICES'] = str(dis_gpu)
+            # os.environ['CUDA_VISIBLE_DEVICES'] = str(dis_gpu)
             distill_port = distill_port_start + i
             distill_cmd = f"conda run -n rea python {distill_dir}/distill.py --dataset_code {dataset_name} --model_code {arch} --bb_model_code {arch} " \
                         f"--num_generated_seqs {seqs_per_proc} --generated_sampler llm_seq -k 100 --port {llama_port_start + i} " \
@@ -119,3 +119,5 @@ for j in range(num_p // len(gpus)):
 #             f"--num_generated_seqs {total_seqs} --generated_sampler llm_seq -k 100"
 # print(f"启动最终 distill 任务：{final_cmd}")
 # subprocess.run(final_cmd, shell=True, cwd=distill_dir)
+
+

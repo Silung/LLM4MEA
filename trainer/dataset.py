@@ -37,14 +37,15 @@ class AbstractDistillationDataset(metaclass=ABCMeta):
         dataset = pickle.load(dataset_path.open('rb'))
         return dataset
 
-    def save_dataset(self, tokens, logits, candidates):
+    def save_dataset(self, tokens, logits, candidates, gts):
         dataset_path = self._get_distillation_dataset_path()
         if not dataset_path.parent.is_dir():
             dataset_path.parent.mkdir(parents=True)
 
         dataset = {'seqs': tokens,
             'logits': logits,
-            'candidates': candidates}
+            'candidates': candidates, 
+            'gts':gts}
         
         with dataset_path.open('wb') as f:
             pickle.dump(dataset, f)

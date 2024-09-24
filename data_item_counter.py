@@ -35,6 +35,12 @@ def diversity(path):
 
     print(len(data))
     
-diversity('gen_data.old/beauty/narm_5000_100/llm_seq_dataset.pkl')
-diversity('gen_data.old/beauty/narm_5000_100/autoregressive_dataset.pkl')
-diversity('data/preprocessed/beauty_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
+dataset_names = ['ml-1m', 'steam', 'beauty']
+for dataset_name in dataset_names:
+    print(dataset_name)
+    print("LLM")
+    diversity(f'gen_data.old/{dataset_name}/narm_5000_100/llm_seq_dataset.pkl')
+    print("Auto")
+    diversity(f'gen_data.old/{dataset_name}/narm_5000_100/autoregressive_dataset.pkl')
+    print("Org")
+    diversity(f'data/preprocessed/{dataset_name}_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')

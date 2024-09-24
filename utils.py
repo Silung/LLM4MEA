@@ -175,13 +175,13 @@ parser.add_argument('--log_period_as_iter', type=int, default=12800)
 parser.add_argument('--metric_ks', nargs='+', type=int, default=[1, 5, 10, 20])
 parser.add_argument('--best_metric', type=str, default='NDCG@10')
 # loss #
-parser.add_argument('--loss', type=str, default='ranking', choices=['ranking', 'kl', 'kl+ct', 'myranking', 'list', 'list+neg', 'kl+ranking'])
+parser.add_argument('--loss', type=str, default='ranking', choices=['ranking', 'kl', 'kl+ct', 'myranking', 'list', 'list+neg', 'ce+ranking'])
 
 ################
 # Model
 ################
-parser.add_argument('--model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm','gru'])
-parser.add_argument('--bb_model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm','gru'])
+parser.add_argument('--model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm', 'gru'])
+parser.add_argument('--bb_model_code', type=str, default=None, choices=[None, 'bert', 'sas', 'narm', 'gru'])
 # BERT specs, used for SASRec and NARM as well #
 parser.add_argument('--bert_max_len', type=int, default=None)
 parser.add_argument('--bert_hidden_units', type=int, default=64)
@@ -196,7 +196,7 @@ parser.add_argument('--bert_mask_prob', type=float, default=0.2)
 # Distillation & Retraining
 ################
 parser.add_argument('--num_generated_seqs', type=int, default=5000)
-parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'llm_pfl', 'mix', 'llm_exam', 'llm_seq', 'llm_seq_test'])
+parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'llm_pfl', 'mix', 'llm_exam', 'llm_seq', 'llm_seq_test', 'self'])
 parser.add_argument('-k', type=int, default=100)
 parser.add_argument('--num_original_seqs', type=int, default=0)
 parser.add_argument('--num_poisoned_seqs', type=int, default=100)
@@ -224,7 +224,7 @@ parser.add_argument('--port', type=int, default=1960)
 parser.add_argument('--shuffle', action="store_true")
 parser.add_argument('--gen_data_only', action="store_true")
 parser.add_argument('--completion', action="store_true")
-parser.add_argument('--few_shot', action="store_true")
+parser.add_argument('--few_shot', type=int, default=0)
 parser.add_argument('--debug', action="store_true")
 parser.add_argument('--noise', action="store_true")
 

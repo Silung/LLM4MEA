@@ -82,12 +82,12 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         elif self.loss == 'kl+ct':
             self.loss_func_1 = nn.KLDivLoss(reduction='batchmean')
             self.loss_func_2 = nn.CrossEntropyLoss(ignore_index=0)
-        elif self.loss == 'kl+ranking':
-            self.loss_func_1 = nn.KLDivLoss(reduction='batchmean')
+        elif self.loss == 'ce+ranking':
+            self.loss_func_1 = nn.CrossEntropyLoss()
             self.loss_func_2 = nn.MarginRankingLoss(margin=self.margin_topk)
             self.loss_func_3 = nn.MarginRankingLoss(margin=self.margin_neg)
 
-    def calculate_loss(self, seqs, labels, candidates, lengths=None):
+    def calculate_loss(self, seqs, labels, candidates, lengths=None, gts=None):
         if isinstance(self.model, BERT) or isinstance(self.model, SASRec):
             logits = self.model(seqs)[:, -1, :]
         elif isinstance(self.model, NARM) or isinstance(self.model, GRU4REC):
@@ -112,7 +112,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             loss = self.loss_func_1(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
             loss += self.loss_func_2(logits, neg_logits, torch.ones(logits.shape).to(self.device))
             
-        elif self.loss == 'kl+ranking':
+        elif self.loss == 'ce+ranking':
             if self.epoch > 20:
                 weight = torch.ones_like(logits).to(self.device)
                 # logits = F.softmax(logits/self.tau, dim=-1)
@@ -126,11 +126,10 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                 loss = self.loss_func_2(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
                 loss += self.loss_func_3(logits, neg_logits, torch.ones(logits.shape).to(self.device))
             else:
-                # KL
-                logits = torch.gather(logits, -1, candidates)
+                # CE
+                # logits = torch.gather(logits, -1, candidates)
                 logits = logits.view(-1, logits.size(-1))
-                labels = labels.view(-1, labels.size(-1))
-                loss = self.loss_func_1(F.log_softmax(logits/self.tau, dim=-1), F.softmax(labels/self.tau, dim=-1))
+                loss = self.loss_func_1(logits, gts.reshape(-1))
         
         elif self.loss == 'myranking':
             weight = torch.ones_like(logits).to(self.device)
@@ -241,16 +240,26 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
 
     def generate_data(self, k=100, batch_size=50):
         dataset = dis_dataset_factory(self.args, self.model_code, self.args.generated_sampler)
-        if self.args.few_shot:
+        if self.args.generated_sampler == 'self' or self.args.few_shot != 0:
             org_dataset = dataset_factory(self.args)
             org_dataset = org_dataset.load_dataset()
             org_data = org_dataset['train']
-            org_data = np.concatenate([np.array(v) for v in org_data.values()])
+            org_data = [torch.tensor(v) for v in org_data.values()]
+            random.shuffle(org_data)
+            
+            def pad_tensor(tensor, length):
+                repeat_times = length // tensor.size(0) + 1 # 计算需要重复的次数
+                padded_tensor = tensor.repeat(repeat_times)[:length]  # 重复并裁剪到目标长度
+                return padded_tensor
+            
+            org_data = torch.stack([pad_tensor(t, self.max_len + 1) for t in org_data])
+            
         if dataset.check_data_present():
             print('Dataset already exists. Skip generation')
             return
 
         gen_step = 1
+        offset = 0
         if self.args.generated_sampler == 'llm':
             agent = Agent(self.args)
         elif self.args.generated_sampler == 'llm_pfl':
@@ -280,8 +289,11 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                 #     random_tokens[idx] = np.random.permutation(np.arange(self.num_items))[:self.max_len] + 1
                 # random_tokens = torch.tensor(random_tokens)
                 random_tokens = torch.randint(low=1, high=self.num_items+1, size=(batch_size, self.max_len), dtype=torch.int)
-            if self.args.few_shot:
-                seqs = torch.tensor(np.random.choice(org_data, batch_size, replace=True)).reshape(batch_size, 1).to(self.device)
+            if self.args.few_shot > 0:
+                rand_base = random.randint(0, self.max_len - self.args.few_shot)
+                seqs = org_data[i * batch_size:(i+1) * batch_size, rand_base:rand_base+1].to(self.device)
+            elif self.args.generated_sampler == 'self':
+                seqs = org_data[i * batch_size:(i+1) * batch_size, 0:1].to(self.device)
             else:
                 seqs = torch.randint(1, self.num_items + 1, (batch_size, 1)).to(self.device)
             # print(f'first item: {seqs[0]}')
@@ -344,17 +356,22 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         else:
                             selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
                         
-                        if gen_step != 1:
-                            if len(temp_seq[0]) == 0:
-                                row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
-                                temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
-                            seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
-                            temp_seq = temp_seq[:, 1:]
-                        elif self.args.generated_sampler == 'random':
-                            seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
+                        if j < self.args.few_shot - 1:
+                            seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].to(self.device)), 1)
                         else:
-                            row_indices = torch.arange(sorted_items_k.size(0))
-                            seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
+                            if gen_step != 1:
+                                if len(temp_seq[0]) == 0:
+                                    row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
+                                    temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
+                                seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
+                                temp_seq = temp_seq[:, 1:]
+                            elif self.args.generated_sampler == 'random':
+                                seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
+                            elif self.args.generated_sampler == 'self':
+                                seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, j+1:j+2].to(self.device)), 1)
+                            else:
+                                row_indices = torch.arange(sorted_items_k.size(0))
+                                seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
 
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
@@ -422,17 +439,22 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         else:                           
                             selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
                         
-                        if gen_step != 1:
-                            if len(temp_seq[0]) == 0:
-                                row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
-                                temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
-                            seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
-                            temp_seq = temp_seq[:, 1:]
-                        elif self.args.generated_sampler == 'random':
-                            seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
+                        if j < self.args.few_shot - 1:
+                            seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].to(self.device)), 1)
                         else:
-                            row_indices = torch.arange(sorted_items_k.size(0))
-                            seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
+                            if gen_step != 1:
+                                if len(temp_seq[0]) == 0:
+                                    row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
+                                    temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
+                                seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
+                                temp_seq = temp_seq[:, 1:]
+                            elif self.args.generated_sampler == 'random':
+                                seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
+                            elif self.args.generated_sampler == 'self':
+                                seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, j+1:j+2].to(self.device)), 1)
+                            else:
+                                row_indices = torch.arange(sorted_items_k.size(0))
+                                seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
 
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
@@ -489,17 +511,22 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         else:
                             selected_indices = torch.distributions.Categorical(F.softmax(torch.ones_like(randomized_label), -1).to(randomized_label.device)).sample()
                         
-                        if gen_step != 1:
-                            if len(temp_seq[0]) == 0:
-                                row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
-                                temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
-                            seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
-                            temp_seq = temp_seq[:, 1:]
-                        elif self.args.generated_sampler == 'random':
-                            seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
+                        if j < self.args.few_shot - 1:
+                            seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].to(self.device)), 1)
                         else:
-                            row_indices = torch.arange(sorted_items_k.size(0))
-                            seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
+                            if gen_step != 1:
+                                if len(temp_seq[0]) == 0:
+                                    row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
+                                    temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
+                                seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
+                                temp_seq = temp_seq[:, 1:]
+                            elif self.args.generated_sampler == 'random':
+                                seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
+                            elif self.args.generated_sampler == 'self':
+                                seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, j+1:j+2].to(self.device)), 1)
+                            else:
+                                row_indices = torch.arange(sorted_items_k.size(0))
+                                seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
                         
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
@@ -520,16 +547,23 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
                     candidates = torch.cat((candidates, sorted_items_k.unsqueeze(1)), 1)
 
+                # if self.args.generated_sampler == 'self':
+                #     gt = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, self.max_len:self.max_len+1].to(self.device)), 1)[:, 1:]
+                # gt = seqs[:, 1:]
+                gt = torch.tensor([])
+
                 if i == 0:
                     batch_tokens = seqs.cpu().numpy()
                     batch_logits = logits.cpu().numpy()
                     batch_candidates = candidates.cpu().numpy()
+                    gts = gt.cpu().numpy()
                 else:
                     batch_tokens = np.concatenate((batch_tokens, seqs.cpu().numpy()))
                     batch_logits = np.concatenate((batch_logits, logits.cpu().numpy()))
                     batch_candidates = np.concatenate((batch_candidates, candidates.cpu().numpy()))
+                    gts = np.concatenate((gts, gt.cpu().numpy()))
 
-        dataset.save_dataset(batch_tokens.tolist(), batch_logits.tolist(), batch_candidates.tolist())
+        dataset.save_dataset(batch_tokens.tolist(), batch_logits.tolist(), batch_candidates.tolist(), gts.tolist())
 
     def train(self):        
         accum_iter = self.last_accum_iter
@@ -565,18 +599,18 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         for batch_idx, batch in enumerate(tqdm_dataloader):
             self.optimizer.zero_grad()
             if isinstance(self.model, BERT) or isinstance(self.model, SASRec):
-                seqs, candidates, labels = batch
-                seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
-                loss = self.calculate_loss(seqs, labels, candidates)
+                seqs, candidates, labels, gts = batch
+                seqs, candidates, labels, gts = seqs.to(self.device), candidates.to(self.device), labels.to(self.device), gts.to(self.device)
+                loss = self.calculate_loss(seqs, labels, candidates, gts=gts)
             elif isinstance(self.model, NARM) or isinstance(self.model, GRU4REC):
-                seqs, lengths, candidates, labels = batch
+                seqs, lengths, candidates, labels, gts = batch
                 if self.args.noise:
                     noise_p = torch.rand(seqs.shape)
                     seqs_noise = torch.randint_like(seqs, 1, self.args.num_items + 1)
                     seqs = torch.where(noise_p < 0.1, seqs_noise, seqs)
                 lengths = lengths.flatten()
-                seqs, candidates, labels = seqs.to(self.device), candidates.to(self.device), labels.to(self.device)
-                loss = self.calculate_loss(seqs, labels, candidates, lengths=lengths)
+                seqs, candidates, labels, gts = seqs.to(self.device), candidates.to(self.device), labels.to(self.device), gts.to(self.device)
+                loss = self.calculate_loss(seqs, labels, candidates, lengths=lengths, gts=gts)
             
             loss.backward()
             self.clip_gradients(5)
