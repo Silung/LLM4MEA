@@ -138,7 +138,11 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             # assume candidates are in descending order w.r.t. true label
             neg_logits = torch.gather(logits, -1, neg_samples)
             logits = torch.gather(logits, -1, candidates)
-            p = random.randint(1, (logits.size()[1] + 1)//2)
+            if random.random() < 0.5:
+                p = 1
+            else:
+                # p = random.randint(1, (logits.size()[1] + 1)//2)
+                p = random.randint(2, 10)
             logits_1 = logits[:, :-p].reshape(-1)
             logits_2 = logits[:, p:].reshape(-1)
             loss = self.loss_func_1(logits_1, logits_2, torch.ones(logits_1.shape).to(self.device))
@@ -266,7 +270,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             agent = ProfileAgent(self.args)
         elif self.args.generated_sampler == 'llm_exam':
             agent = ExampleAgent(self.args)
-        elif self.args.generated_sampler in ['llm_seq', 'llm_seq_test']:
+        elif self.args.generated_sampler in ['llm_seq', 'llm_seq_test', 'mix']:
             agent = SeqAgent(self.args)
             if self.args.dataset_code == 'ml-1m':
                 gen_step = 10
@@ -301,11 +305,25 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             candidates = None
             temp_seq = [[]]
             
+            j_start = 0
+            if 'gpt' in self.args.llm:
+                if not os.path.exists('batch_log'):
+                    os.makedirs('batch_log')
+                temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                if os.path.isfile(temp_file_path):
+                    with open(temp_file_path, 'rb') as f:
+                        temp = pickle.load(f)
+                    seqs = temp['seqs']
+                    logits = temp['logits']
+                    candidates = temp['candidates']
+                    j_start = temp['j'] + 1
+                    temp_seq = temp['temp_seq']
+            
             self.bb_model.eval()
             with torch.no_grad():
                 if isinstance(self.bb_model, BERT):
                     mask_items = torch.tensor([self.CLOZE_MASK_TOKEN] * seqs.size(0)).to(self.device)
-                    for j in range(self.max_len - 1):
+                    for j in range(j_start, self.max_len - 1):
                         if agent is not None and j != 0 and j % 30 == 0:
                             agent.update_profiles(list(range(i, self.args.num_generated_seqs if (i+1) * batch_size > self.args.num_generated_seqs else (i+1) * batch_size)), batch_size)
                         
@@ -335,19 +353,24 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             t_sorted_items_k = sorted_items_k.cpu().numpy()
                             t_seqs = seqs.cpu().numpy()
                             for w, items in enumerate(t_sorted_items_k):
-                                items_list = list(set(items) - set(t_seqs[w]))
-                                if self.args.completion:
-                                    while len(items_list) < k:
-                                        rd_item = random.randint(1, self.num_items)
-                                        if rd_item in items_list or rd_item in t_seqs[w]:
-                                            continue
-                                        else:
-                                            items_list.append(rd_item)
-                                elif len(items_list) == 0:
-                                    items_list = list(items)
+                                if self.args.generated_sampler == 'mix':
+                                    items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
+                                    items_list = items_list[:k]
+                                else:
+                                    items_list = list(set(items) - set(t_seqs[w]))
+                                # if self.args.completion:
+                                while len(items_list) < k:
+                                    rd_item = random.randint(1, self.num_items)
+                                    if rd_item in items_list or rd_item in t_seqs[w]:
+                                        continue
+                                    else:
+                                        items_list.append(rd_item)
+                                items_list = items_list[:k]
+                                # elif len(items_list) == 0:
+                                #     items_list = list(items)
                                 random.shuffle(items_list)
                                 sorted_items.append(items_list)
-                            sorted_items = torch.tensor(sorted_items)
+                            # sorted_items = torch.tensor(sorted_items)
                             selected_indices = agent(sorted_items)
                             # randomized_label = torch.ones_like(sorted_items_k).to(self.device)
                         elif self.args.generated_sampler == 'random':
@@ -380,6 +403,18 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             logits = randomized_label.unsqueeze(1)
                             candidates = sorted_items_k.unsqueeze(1)
                         # print(f'seqs[0]: {seqs[0]}')
+                        if 'gpt' in self.args.llm:
+                            if not os.path.exists('batch_log'):
+                                os.makedirs('batch_log')
+                            temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                            temp = {'seqs': seqs,
+                                'logits': logits,
+                                'candidates': candidates,
+                                'j':j,
+                                'temp_seq':temp_seq}
+                    
+                            with open(temp_file_path, 'wb') as f:
+                                pickle.dump(temp, f)
                     
                     input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
                     input_seqs[:, :-1] = seqs[:, -(self.max_len-1):]
@@ -397,7 +432,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     candidates = torch.cat((candidates, sorted_items.unsqueeze(1)), 1)
 
                 elif isinstance(self.bb_model, SASRec):
-                    for j in range(self.max_len - 1):
+                    for j in range(j_start, self.max_len - 1):
                         if agent is not None and j != 0 and j % 30 == 0:
                             agent.update_profiles(list(range(i, self.args.num_generated_seqs if (i+1) * batch_size > self.args.num_generated_seqs else (i+1) * batch_size)), batch_size)
                         
@@ -419,19 +454,24 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             t_sorted_items_k = sorted_items_k.cpu().numpy()
                             t_seqs = seqs.cpu().numpy()
                             for w, items in enumerate(t_sorted_items_k):
-                                items_list = list(set(items) - set(t_seqs[w]))
-                                if self.args.completion:
-                                    while len(items_list) < k:
-                                        rd_item = random.randint(1, self.num_items)
-                                        if rd_item in items_list or rd_item in t_seqs[w]:
-                                            continue
-                                        else:
-                                            items_list.append(rd_item)
-                                elif len(items_list) == 0:
-                                    items_list = list(items)
+                                if self.args.generated_sampler == 'mix':
+                                    items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
+                                    items_list = items_list[:k]
+                                else:
+                                    items_list = list(set(items) - set(t_seqs[w]))
+                                # if self.args.completion:
+                                while len(items_list) < k:
+                                    rd_item = random.randint(1, self.num_items)
+                                    if rd_item in items_list or rd_item in t_seqs[w]:
+                                        continue
+                                    else:
+                                        items_list.append(rd_item)
+                                items_list = items_list[:k]
+                                # elif len(items_list) == 0:
+                                #     items_list = list(items)
                                 random.shuffle(items_list)
                                 sorted_items.append(items_list)
-                            sorted_items = torch.tensor(sorted_items)
+                            # sorted_items = torch.tensor(sorted_items)
                             selected_indices = agent(sorted_items)
                             # randomized_label = torch.ones_like(sorted_items_k).to(self.device)
                         elif self.args.generated_sampler == 'random':
@@ -462,6 +502,19 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         except:
                             logits = randomized_label.unsqueeze(1)
                             candidates = sorted_items_k.unsqueeze(1)
+                            
+                        if 'gpt' in self.args.llm:
+                            if not os.path.exists('batch_log'):
+                                os.makedirs('batch_log')
+                            temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                            temp = {'seqs': seqs,
+                                'logits': logits,
+                                'candidates': candidates,
+                                'j':j,
+                                'temp_seq':temp_seq}
+                    
+                            with open(temp_file_path, 'wb') as f:
+                                pickle.dump(temp, f)
 
                     labels = self.bb_model(seqs.long())[:, -1, :]
                     _, sorted_items = torch.sort(labels[:, 1:], dim=-1, descending=True)
@@ -474,7 +527,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     candidates = torch.cat((candidates, sorted_items_k.unsqueeze(1)), 1)
 
                 elif isinstance(self.bb_model, NARM) or isinstance(self.bb_model, GRU4REC):
-                    for j in range(self.max_len - 1):
+                    for j in range(j_start, self.max_len - 1):
                         lengths = torch.tensor([j + 1] * seqs.size(0))
                         labels = self.bb_model(seqs.long(), lengths)
 
@@ -492,19 +545,23 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             t_sorted_items_k = sorted_items_k.cpu().numpy()
                             t_seqs = seqs.cpu().numpy()
                             for w, items in enumerate(t_sorted_items_k):
-                                items_list = list(set(items) - set(t_seqs[w]))
-                                if self.args.completion:
-                                    while len(items_list) < k:
-                                        rd_item = random.randint(1, self.num_items)
-                                        if rd_item in items_list or rd_item in t_seqs[w]:
-                                            continue
-                                        else:
-                                            items_list.append(rd_item)
-                                elif len(items_list) == 0:
-                                    items_list = list(items)
+                                if self.args.generated_sampler == 'mix':
+                                    items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
+                                    items_list = items_list[:k]
+                                else:
+                                    items_list = list(set(items) - set(t_seqs[w]))
+                                # if self.args.completion:
+                                while len(items_list) < k:
+                                    rd_item = random.randint(1, self.num_items)
+                                    if rd_item in items_list or rd_item in t_seqs[w]:
+                                        continue
+                                    else:
+                                        items_list.append(rd_item)
+                                items_list = items_list[:k]
+                                # elif len(items_list) == 0:
+                                #     items_list = list(items)
                                 random.shuffle(items_list)
                                 sorted_items.append(items_list)
-                            sorted_items = torch.tensor(sorted_items)
                             selected_indices = agent(sorted_items)
                         elif self.args.generated_sampler == 'random':
                             pass
@@ -534,6 +591,19 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         except:
                             logits = randomized_label.unsqueeze(1)
                             candidates = sorted_items_k.unsqueeze(1)
+                            
+                        if 'gpt' in self.args.llm:
+                            if not os.path.exists('batch_log'):
+                                os.makedirs('batch_log')
+                            temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                            temp = {'seqs': seqs,
+                                'logits': logits,
+                                'candidates': candidates, 
+                                'j':j,
+                                'temp_seq':temp_seq}
+                    
+                            with open(temp_file_path, 'wb') as f:
+                                pickle.dump(temp, f)
                         
                     lengths = torch.tensor([self.max_len] * seqs.size(0))
                     labels = self.bb_model(seqs.long(), lengths)
@@ -570,7 +640,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         self.writer, self.train_loggers, self.val_loggers = self._create_loggers()
         self.logger_service = LoggerService(
             self.train_loggers, self.val_loggers)
-        self.generate_data(k=self.args.k, batch_size=1)
+        self.generate_data(k=self.args.k, batch_size=self.args.batch_size)
         if self.args.gen_data_only:
             return
         dis_train_loader, dis_val_loader = dis_train_loader_factory(self.args, self.model_code, self.args.generated_sampler)

@@ -76,5 +76,5 @@ if __name__ == "__main__":
     # args.min_sc = k
     if args.device =='dml' and torch_directml.is_available():
         args.device = torch_directml.device(torch_directml.default_device())
-    distill(args=args, resume=False)
+    distill(args=args, resume=args.resume)
 

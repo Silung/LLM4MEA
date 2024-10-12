@@ -17,13 +17,16 @@ import random
 # narm beauty
 
 # 配置
-gpus = [5,7]  # 可用显卡列表
+gpus = [4,6,7]  # 可用显卡列表
 # total_seqs = 25000    # num_generated_seqs的总和
-seqs_per_proc = 500
-id_start = 3
-num_p = 50 - id_start
-arch = 'sas'
-dataset_name = 'ml-1m'
+seqs_per_proc = 506
+id_start = 0
+num_p = 10 - id_start
+arch = 'narm'
+dataset_name = 'steam'
+sampler = ['llm_seq', 'mix'][0]
+
+# few_shot = 3
 
 # llama_port_start = 1965
 # distill_port_start = 2000
@@ -59,7 +62,7 @@ for i, gpu in enumerate(gpus):
     time.sleep(1)
 time.sleep(60)  # 给每个程序一些时间来启动
 
-for j in range(num_p // len(gpus)):
+for j in range((num_p // len(gpus)) if num_p % len(gpus)==0 else (num_p // len(gpus) + 1)):
     # 记录所有子进程
     processes = []
     # 启动 distill.py 程序
@@ -68,8 +71,11 @@ for j in range(num_p // len(gpus)):
             print(f'pid={j * len(gpus) + i}')
             # os.environ['CUDA_VISIBLE_DEVICES'] = str(dis_gpu)
             distill_port = distill_port_start + i
+            # distill_cmd = f"conda run -n rea python {distill_dir}/distill.py --dataset_code {dataset_name} --model_code {arch} --bb_model_code {arch} " \
+            #             f"--num_generated_seqs {seqs_per_proc} --generated_sampler {sampler} -k 100 --port {llama_port_start + i} " \
+            #             f"--id {id_start + i + j * len(gpus)} --gen_data_only --device cpu --few_shot {few_shot}"
             distill_cmd = f"conda run -n rea python {distill_dir}/distill.py --dataset_code {dataset_name} --model_code {arch} --bb_model_code {arch} " \
-                        f"--num_generated_seqs {seqs_per_proc} --generated_sampler llm_seq -k 100 --port {llama_port_start + i} " \
+                        f"--num_generated_seqs {seqs_per_proc} --generated_sampler {sampler} -k 100 --port {llama_port_start + i} " \
                         f"--id {id_start + i + j * len(gpus)} --gen_data_only --device cpu"
             print(f"启动 distill 程序：{distill_cmd}")
             p = subprocess.Popen(distill_cmd, shell=True, cwd=distill_dir)

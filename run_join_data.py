@@ -15,12 +15,13 @@ def rename_old(path):
 
 # 配置
 dis_gpu = [3]  # 可用显卡
-seqs_per_proc = 500
+seqs_per_proc = 506
 id_start = 0
 num_p = 50 - id_start
-arch = 'bert'
-dataset_name = 'beauty'
+arch = 'narm'
+dataset_name = 'steam'
 total_seqs = seqs_per_proc * num_p    # num_generated_seqs的总和
+sampler = ['llm_seq', 'mix'][0]
 
 step = 10
 
@@ -30,7 +31,7 @@ distill_dir = "/data/zhaoshilong/REA_with_llm"
 root = f'gen_data/{dataset_name}/{arch}_{seqs_per_proc}_100'
 
 for idx in range(num_p // step):
-    paths = [f'llm_seq{i}_dataset.pkl' for i in range(idx * step , (idx + 1) * step)]
+    paths = [f'{sampler}{i}_dataset.pkl' for i in range(idx * step , (idx + 1) * step)]
     print(paths)
     datasets = []
     try:
@@ -52,7 +53,7 @@ for idx in range(num_p // step):
     
     if not os.path.exists(f'gen_data/{dataset_name}/{arch}_{step*seqs_per_proc}_100'):
         os.mkdir(f'gen_data/{dataset_name}/{arch}_{step*seqs_per_proc}_100')
-    target_path = os.path.join(f'gen_data/{dataset_name}/{arch}_{step*seqs_per_proc}_100', f'llm_seq{idx}_dataset.pkl')
+    target_path = os.path.join(f'gen_data/{dataset_name}/{arch}_{step*seqs_per_proc}_100', f'{sampler}{idx}_dataset.pkl')
     rename_old(target_path)
     with open(target_path, 'wb') as f:
         pickle.dump(dataset3, f)

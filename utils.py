@@ -220,13 +220,16 @@ parser.add_argument('--attack_mode', type=str, default='wb_grad', choices=['wb_g
 
 
 parser.add_argument('--id', type=str, default='')
+parser.add_argument('--cases_path', type=str, default=None)
 parser.add_argument('--port', type=int, default=1960)
 parser.add_argument('--shuffle', action="store_true")
 parser.add_argument('--gen_data_only', action="store_true")
-parser.add_argument('--completion', action="store_true")
+# parser.add_argument('--completion', action="store_true")
 parser.add_argument('--few_shot', type=int, default=0)
 parser.add_argument('--debug', action="store_true")
 parser.add_argument('--noise', action="store_true")
+parser.add_argument('--resume', action="store_true")
+parser.add_argument('--llm', type=str, default='llama', choices=['llama', 'gpt-4o-mini_batch', 'gpt-test'])
 
 
 args = parser.parse_args()

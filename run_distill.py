@@ -14,11 +14,11 @@ def rename_old(path):
 
 
 # 配置
-dis_gpu = [5,7]  # 可用显卡
+dis_gpu = [2]  # 可用显卡
 seqs_per_proc = 500
 id_start = 0
 num_p = 50 - id_start
-arch = 'bert'
+arch = 'narm'
 dataset_name = ['ml-1m', 'steam', 'beauty'][0]
 sampler = ['llm_seq', 'random', 'autoregressive', 'self'][1]
 loss = ['ranking', 'ce+ranking'][0]
