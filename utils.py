@@ -229,6 +229,7 @@ parser.add_argument('--few_shot', type=int, default=0)
 parser.add_argument('--debug', action="store_true")
 parser.add_argument('--noise', action="store_true")
 parser.add_argument('--resume', action="store_true")
+parser.add_argument('--aug', action="store_true")
 parser.add_argument('--llm', type=str, default='llama', choices=['llama', 'gpt-4o-mini_batch', 'gpt-test'])
 
 

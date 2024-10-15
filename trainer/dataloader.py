@@ -90,12 +90,21 @@ class BERTDistillationTrainingDataset(data_utils.Dataset):
                 gt = gts[i]
 
             for j in range(0, len(seq)-1):
-                masked_seq = seq[:j+1] + [self.mask_token]
-                self.all_seqs += [masked_seq]
-                self.all_labels += [label[j]]
-                self.all_candidates += [candidate[j]]
-                if gts is not None:
-                    self.all_gts += [[gt[j]]]
+                if args.aug:
+                    for k in range(0,j+1):
+                        masked_seq = seq[k:j+1] + [self.mask_token]
+                        self.all_seqs += [masked_seq]
+                        self.all_labels += [label[j]]
+                        self.all_candidates += [candidate[j]]
+                        if gts is not None:
+                            self.all_gts += [[gt[j]]]
+                else:
+                    masked_seq = seq[:j+1] + [self.mask_token]
+                    self.all_seqs += [masked_seq]
+                    self.all_labels += [label[j]]
+                    self.all_candidates += [candidate[j]]
+                    if gts is not None:
+                        self.all_gts += [[gt[j]]]
         
         if len(self.all_gts) > 0:
             assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates) == len(self.all_gts)
@@ -164,11 +173,19 @@ class SASDistillationTrainingDataset(data_utils.Dataset):
                 gt = gts[i]
             
             for j in range(1, len(seq)):
-                self.all_seqs += [seq[:-j]]
-                self.all_labels += [label[-j-1]]
-                self.all_candidates += [candidate[-j-1]]
-                if gts is not None:
-                    self.all_gts += [[gt[-j-1]]]
+                if args.aug:
+                    for k in range(0,len(seq)-j):
+                        self.all_seqs += [seq[k:-j]]
+                        self.all_labels += [label[-j-1]]
+                        self.all_candidates += [candidate[-j-1]]
+                        if gts is not None:
+                            self.all_gts += [[gt[-j-1]]]
+                else:
+                    self.all_seqs += [seq[:-j]]
+                    self.all_labels += [label[-j-1]]
+                    self.all_candidates += [candidate[-j-1]]
+                    if gts is not None:
+                        self.all_gts += [[gt[-j-1]]]
         if len(self.all_gts) > 0:
             assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates) == len(self.all_gts)
         else:
@@ -230,11 +247,19 @@ class NARMDistillationTrainingDataset(data_utils.Dataset):
                 gt = gts[i]
 
             for j in range(1, len(seq)):
-                self.all_seqs += [seq[:-j]]
-                self.all_labels += [label[-j-1]]
-                self.all_candidates += [candidate[-j-1]]
-                if gts is not None:
-                    self.all_gts += [[gt[-j-1]]]
+                if args.aug:
+                    for k in range(0,len(seq)-j):
+                        self.all_seqs += [seq[k:-j]]
+                        self.all_labels += [label[-j-1]]
+                        self.all_candidates += [candidate[-j-1]]
+                        if gts is not None:
+                            self.all_gts += [[gt[-j-1]]]
+                else:
+                    self.all_seqs += [seq[:-j]]
+                    self.all_labels += [label[-j-1]]
+                    self.all_candidates += [candidate[-j-1]]
+                    if gts is not None:
+                        self.all_gts += [[gt[-j-1]]]
         if len(self.all_gts) > 0:
             assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates) == len(self.all_gts)
         else:
