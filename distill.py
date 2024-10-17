@@ -17,7 +17,7 @@ except:
 def distill(args, bb_model_root=None, export_root=None, resume=False):
     args.lr = 0.001
     args.enable_lr_warmup = False
-    # fix_random_seed_as(args.model_init_seed)
+    fix_random_seed_as(args.model_init_seed)
     _, _, test_loader = dataloader_factory(args)
 
     if args.model_code == 'bert':

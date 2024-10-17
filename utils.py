@@ -89,7 +89,7 @@ def set_template(args, mode='train'):
     args.train_negative_sampling_seed = 0
     args.test_negative_sampler_code = 'random'
     args.test_negative_sample_size = 100
-    args.test_negative_sampling_seed = 98765
+    args.test_negative_sampling_seed = 0
 
     model_codes = {'b': 'bert', 's':'sas', 'n':'narm'}
     if args.model_code is None:
@@ -112,7 +112,7 @@ def set_template(args, mode='train'):
 
     args.metric_ks = [1, 5, 10]
     args.best_metric = 'NDCG@10'
-    args.model_init_seed = 98765
+    args.model_init_seed = 0
     args.bert_num_blocks = 2
     args.bert_num_heads = 2
     args.bert_head_size = None
