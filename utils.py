@@ -231,6 +231,7 @@ parser.add_argument('--noise', action="store_true")
 parser.add_argument('--resume', action="store_true")
 parser.add_argument('--aug', action="store_true")
 parser.add_argument('--llm', type=str, default='llama', choices=['llama', 'gpt-4o-mini_batch', 'gpt-test'])
+parser.add_argument('--val_strategy', type=str, default='top1', choices=['top1', 'decay'])
 
 
 args = parser.parse_args()

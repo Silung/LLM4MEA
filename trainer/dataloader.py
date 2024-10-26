@@ -141,7 +141,10 @@ class BERTDistillationValidationDataset(data_utils.Dataset):
             label = labels[i]
             candidate = candidates[i]
             self.all_seqs += [seq + [self.mask_token]]
-            self.all_labels += [[1] + [0] * (len(label[-1]) - 1)]
+            if args.val_strategy == 'decay':
+                self.all_labels += [[1/(w+1) for w in range(len(label[-1]))]]
+            else:
+                self.all_labels += [[1] + [0] * (len(label[-1]) - 1)]
             self.all_candidates += [candidate[-1]]
 
         assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
@@ -216,8 +219,7 @@ class SASDistillationValidationDataset(data_utils.Dataset):
             candidate = candidates[i]
             
             self.all_seqs += [seq]
-            if args.dataset_code == 'beauty':
-                # self.all_labels += [[1] * 10 + [0] * (len(label[-1]) - 10)]
+            if args.val_strategy == 'decay':
                 self.all_labels += [[1/(w+1) for w in range(len(label[-1]))]]
             else:
                 self.all_labels += [[1] + [0] * (len(label[-1]) - 1)]
@@ -294,7 +296,10 @@ class NARMDistillationValidationDataset(data_utils.Dataset):
             candidate = candidates[i]
             
             self.all_seqs += [seq]
-            self.all_labels += [[1] + [0] * (len(label[-1]) - 1)]
+            if args.val_strategy == 'decay':
+                self.all_labels += [[1/(w+1) for w in range(len(label[-1]))]]
+            else:
+                self.all_labels += [[1] + [0] * (len(label[-1]) - 1)]
             self.all_candidates += [candidate[-1]]
 
         assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
