@@ -11,6 +11,7 @@ import numpy as np
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from tqdm import trange
+from datetime import datetime
 
 
 from datasets import dataset_factory
@@ -35,8 +36,10 @@ class Agent():
         self.watched_items = None
         self.t = 70
         self.call_cc = 0
+        # while os.path.exists(f'batch_log/batch_input_steam_narm_{self.call_cc + 1}.jsonl') and not self.args.debug:
+        #     self.call_cc += 1
         
-        self.init_profiles(self.args.num_generated_seqs)
+        # self.init_profiles(self.args.num_generated_seqs)
         try:
             with open('examples_in_ml.txt', 'r') as f:
                 self.history = f.read().split('\n')
@@ -52,8 +55,14 @@ class Agent():
         else:
             self.his_size = 10
             self.seq_size = 5
+            
+    def set_history(self, seqs):
+        org_items = np.vectorize(self.r_smap.get)(seqs.cpu()) 
+        titles = np.vectorize(self.item_info['title'].get)(org_items)
+        self.watched_items = titles.tolist()
         
     def send_rev(self, msg):
+        self.call_cc += 1
         if self.args.llm == 'llama':
             # 创建TCP socket
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -85,51 +94,62 @@ class Agent():
             if not os.path.exists('batch_log'):
                 os.makedirs('batch_log')
             batch_input_path = os.path.join('batch_log', f'batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.jsonl')
-            
-            with open(batch_input_path, 'w') as f:
-                for idx, m in enumerate(msg):
-                    d = {"custom_id": f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": m, "max_tokens": 5000}}
-                    # print(d)
-                    f.write(json.dumps(d) + '\n')
-            
-            client = OpenAI()
-            batch_input_file = client.files.create(file=open(batch_input_path, "rb"), purpose="batch")
-            batch_input_file_id = batch_input_file.id
-
-            batch_info = client.batches.create(
-                input_file_id=batch_input_file_id,
-                endpoint="/v1/chat/completions",
-                completion_window="24h",
-                metadata={
-                "description": f"{self.args.dataset_code}-{self.args.bb_model_code}"
-                }
-                )
-            time.sleep(10)
-
-            print(f"Submit batch task: {self.args.dataset_code}-{self.args.bb_model_code}-{batch_info.id}")
-
-            # batch_input_file_id = 'batch_6704f47a53948190bd447a82ec4b7e64'
-            while True:
-                try:
-                    response = client.batches.retrieve(batch_info.id)
-                    if response.status == 'completed':
-                        break
-                    elif response.status in ['failed', 'expired', 'cancelling', 'cancelled']:
-                        print(f'API error code: {response.status}')
-                        raise NotImplementedError()
-                except Exception as e:
-                    print(f'Network Error: {str(e)}')
-                time.sleep(5 * 60)
-            time.sleep(10)
-            
-            file_response = client.files.content(response.output_file_id)
             batch_output_path = os.path.join('batch_log', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
-            with open(batch_output_path, 'w') as f:
-                f.write(file_response.text)
-            json_lines = file_response.text.strip().split('\n')
+            
+            if os.path.exists(batch_output_path):
+                with open(batch_output_path, 'r') as f:
+                    text = f.read()
+                json_lines = text.strip().split('\n')                    
+            else:
+                if not os.path.exists(batch_input_path):
+                    with open(batch_input_path, 'w') as f:
+                        for idx, m in enumerate(msg):
+                            d = {"custom_id": f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": m, "max_tokens": 5000}}
+                            # print(d)
+                            f.write(json.dumps(d) + '\n')
+                
+                client = OpenAI()
+                batch_input_file = client.files.create(file=open(batch_input_path, "rb"), purpose="batch")
+                batch_input_file_id = batch_input_file.id
+
+                batch_info = client.batches.create(
+                    input_file_id=batch_input_file_id,
+                    endpoint="/v1/chat/completions",
+                    completion_window="24h",
+                    metadata={
+                    "description": f"{self.args.dataset_code}-{self.args.bb_model_code}"
+                    }
+                    )
+                time.sleep(10)
+
+                current_time = datetime.now().strftime("%H:%M:%S")
+                print(f"Submit at {current_time}\t Submit batch task: {self.args.dataset_code}-{self.args.bb_model_code}-{batch_info.id}")
+
+                # batch_input_file_id = 'batch_6704f47a53948190bd447a82ec4b7e64'
+                while True:
+                    try:
+                        response = client.batches.retrieve(batch_info.id)
+                        if response.status == 'completed':
+                            break
+                        elif response.status in ['failed', 'expired', 'cancelling', 'cancelled']:
+                            print(f'API error code: {response.status}')
+                            raise NotImplementedError()
+                    except Exception as e:
+                        print(f'Network Error: {str(e)}')
+                    time.sleep(2 * 60)
+                time.sleep(10)
+                
+                file_response = client.files.content(response.output_file_id)
+                batch_output_path = os.path.join('batch_log', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
+                with open(batch_output_path, 'w') as f:
+                    f.write(file_response.text)
+                json_lines = file_response.text.strip().split('\n')
 
             loaded_data = [json.loads(line) for line in json_lines]
             id2msg = {data['custom_id']:data['response']['body']['choices'][0]['message'] for data in loaded_data}
+            e = set([f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}" for idx in range(len(msg))]) - set(id2msg.keys())
+            if len(e) > 0:
+                print(f'Fails id: {list(e)}')
             received_data = [id2msg[f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}"] for idx in range(len(msg))]
             # received_data = [id2msg[idx] for idx in ['request-1', 'request-2']]
         
@@ -201,7 +221,7 @@ class Agent():
         
         texts = np.vectorize(join, signature='(n),(n)->()')(titles, genres)
         
-        if self.mem is None:
+        if self.watched_items is None:
             sys = {"role": "system", "content": "You're a user with your own hobbies. Now, I want to recommend a few more movies to you. Select one that you are most interested in. Only answer the title!"}
             output = [[sys, {"role": "user", "content": text}] for text in texts]
         else:
@@ -234,7 +254,7 @@ class Agent():
         
         texts = np.vectorize(join, signature='(n),(n)->()')(titles, genres)
         
-        if self.mem is None:
+        if self.watched_items is None:
             # sys = {"role": "system", "content": ""}
             if self.dataset_code == 'ml-1m':
                 output = [[{"role": "user", "content": f'You are a user with your own preference. Now, I want to recommend a few more movies to you. Select one that you are most interested in. Only answer the title! {text}'}] for text in texts]
@@ -271,7 +291,6 @@ class Agent():
         selected_indices = self.decode(received_data)
         # shape: [B], index start with 1.
         # print(selected_indices[0])
-        self.call_cc += 1
         return selected_indices
     
     def init_profiles(self, size):
@@ -293,7 +312,7 @@ class ExampleAgent(Agent):
         texts = np.vectorize(join, signature='(n),(n)->()')(titles, genres)
         
         j = random.randint(0, 9)
-        if self.mem is None:
+        if self.watched_items is None:
             # sys = {"role": "system", "content": ""}
             output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select one that you are most interested in. Only answer the title! '}] for text in texts]
         else:
@@ -314,22 +333,26 @@ class SeqAgent(Agent):
     def template(self, titles, genres):
         # output: list shaped same as Batch
         
-        def join1(ts, gs):
-            t = ''
-            for i in range(len(ts)):
-                t += f'{i+1}. {ts[i]}({gs[i]}); '
+        def join1(ts):
+            # t = ''
+            # for i in range(len(ts)):
+            #     t += f'{i+1}. {ts[i]}({gs[i]}); '
+            ts = [i[:100] for i in ts]
+            t = ', '.join(ts)
             return t
         
         def join2(ts):
             # t = ''
             # for i in range(len(ts)):
             #     t += f'{i+1}. {ts[i][:80]}; '
-            t = ', '.join(ts)
+            ts = [i[:100] for i in ts]
+            t = '| '.join(ts)
             return t
         
-        if self.dataset_code in ['ml-1m']:
-            texts = np.vectorize(join1, signature='(n),(n)->()')(titles, genres)
-        elif self.dataset_code in ['beauty', 'steam']:
+        if self.dataset_code in ['ml-1m', 'steam']:
+            # texts = np.vectorize(join1, signature='(n),(n)->()')(titles, genres)
+            texts = np.vectorize(join1, signature='(n)->()')(titles)
+        elif self.dataset_code in ['beauty']:
             texts = np.vectorize(join2, signature='(n)->()')(titles)
         
         try:
@@ -344,7 +367,7 @@ class SeqAgent(Agent):
             cases_txt = ""
         
         # j = random.randint(0, 9)
-        if self.mem is None:
+        if self.watched_items is None:
             # sys = {"role": "system", "content": ""}
             # output = [[{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure only answer the title without other words! '}] for text in texts]
             if self.dataset_code == 'ml-1m':
@@ -359,23 +382,29 @@ class SeqAgent(Agent):
                 #             {"role": "user", "content": f"Based on your gaming preferences and past interactions, I have a list of game candidates for you: {text}. Popular game genres include Action, Adventure, Role-Playing (RPG), Strategy, Simulation, and Sports. Please select {self.seq_size} games from this list that you would consider purchasing next, focusing on the genres you usually enjoy. However, keep in mind that users sometimes explore games outside of their typical preferences. Return only the selected game titles in the Python list format (e.g., ['title1', 'title2', 'title3']). Make sure to respond with only the titles and nothing else!"}] for text in texts]
                 # output = [[{"role": "user", "content": f"You are a user with your own preference. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure only answer the title without other words! "}] for text in texts]
                 
-                output = [[{"role":"system", "content":"You are a user on Steam, a digital distribution service for video games."},
-                            {"role": "user", "content": f"Based on your gaming preferences and past interactions, I have a list of game candidates for you. Please select {self.seq_size} games from this list that you are most likely to purchase. Return only the selected game titles in the Python list format with pure text (e.g., ['title1', 'title2']). Make sure to respond with only the titles and nothing else! {cases_txt}Now, recommendations for you: {text}."}] for text in texts]
+                # output = [[{"role":"system", "content":"You are a user on Steam, a digital distribution service for video games."},
+                #             {"role": "user", "content": f"Based on your gaming preferences and past interactions, I have a list of game candidates for you. Please select {self.seq_size} games from this list that you are most likely to purchase. Return only the selected game titles in the Python list format with pure text (e.g., ['title1', 'title2']). Make sure to respond with only the titles and nothing else! {cases_txt}Now, recommendations for you: {text}."}] for text in texts]
+                output = [[{"role": "user", "content": f"Based on your preferences, select {self.seq_size} games from the list below. Return only the selected game titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Here are your recommendations: {text}."}] for text in texts]
         else:
             output = []
             for i, text in enumerate(texts):
                 # print(self.mem[i])
                 # if len(', '.join(self.watched_items[i][-5:])) > 380:
                 #     self.watched_items[i] = self.watched_items[i][:-self.seq_size]
-                ex_len = min(self.his_size, len(self.watched_items))
-                ex_items_head = ', '.join(self.watched_items[i][:ex_len//2])
-                ex_items_tail = ', '.join(self.watched_items[i][ex_len//2:])
+                ex_len = min(self.his_size, len(self.watched_items[0]))
+                if self.dataset_code in ['ml-1m', 'steam']:
+                    sep = ', '
+                else:
+                    sep = '| '
+                ex_items_head = sep.join(self.watched_items[i][:ex_len//2])
+                ex_items_tail = sep.join(self.watched_items[i][ex_len//2:])
                 # print(len(', '.join(self.watched_items[i][-5:])))
                 if self.dataset_code == 'ml-1m':
                     # output.append([{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words! '}])
-                    output.append([{"role": "user", "content": f'You have saw {ex_items_head}...{ex_items_tail}. I want to recommend a few more movies to you: {text}. Select {self.seq_size} movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words!  Note that one user only accesses a few specific categories of items, and please follow the preferences reflected in history.'}])
+                    # output.append([{"role": "user", "content": f'You have saw {ex_items_head}...{ex_items_tail}. I want to recommend a few more movies to you: {text}. Select {self.seq_size} movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words!  Note that one user only accesses a few specific categories of items, and please follow the preferences reflected in history.'}])
+                    output.append([{"role": "user", "content": f"{self.profile[i]} Based on these preferences, select {self.seq_size} movies from the list below. Return only the selected movie titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously watched movies: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}."}])
                 elif self.dataset_code == 'beauty':
-                    output.append([{"role": "user", "content": f"You are a user with your own preference, and you have bought {ex_items_head}...{ex_items_tail}. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure not to choose items you have bought and only answer the title without other words! "}])
+                    output.append([{"role": "user", "content": f"{self.profile[i]} Based on these preferences, select {self.seq_size} items from the list below. Return only the selected items titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously watched items: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}."}])
                 elif self.dataset_code == 'steam':
                     # last update 
                     # output.append([{"role":"system", "content":"You are a user of the Steam, a video game digital distribution service and storefront, and want to purchase your next game."}, 
@@ -384,8 +413,9 @@ class SeqAgent(Agent):
                     #                 {"role": "user", "content": f"You have previously purchased the following games: {ex_items}. Based on your purchase history, I have a list of additional game recommendations for you: {text}. Please select {self.seq_size} games from this list that match your interests, and provide the titles in the order you would buy them, formatted as a Python list (e.g., ['title1', 'title2', 'title3']). Only respond with the list of titles, without any extra text! While users often stick to specific categories, they sometimes explore games outside their typical preferences, so consider this when making your selections."}])
                     # output.appsend([{"role": "user", "content": f"You are a user with your own preference, and you have bought {ex_items}. Now, I want to recommend a few more items to you: {text}. Select {self.seq_size} items from them, then return the titles in the order you plan to buy in the format of python list(i.e. ['a', 'b', 'c']). Make sure not to choose items you have bought and only answer the title without other words! "}])
                     
-                    output.append([{"role": "system", "content": "You are a user on Steam, a digital distribution service for video games."},
-                                    {"role": "user", "content": f"Based on your purchase history, I have a list of additional game recommendations for you. Please select {self.seq_size} games from this list that you are most likely to purchase. Provide the titles in the Python list format with pure text (e.g., ['title1', 'title2']). Only respond with the list of titles, without any extra text! {cases_txt}You have previously viewed the following games: {ex_items_head}...{ex_items_tail}. Recommendations for you: {text}"}])
+                    # output.append([{"role": "system", "content": "You are a user on Steam, a digital distribution service for video games."},
+                    #                 {"role": "user", "content": f"Based on your purchase history, I have a list of additional game recommendations for you. Please select {self.seq_size} games from this list that you are most likely to purchase. Provide the titles in the Python list format with pure text (e.g., ['title1', 'title2']). Only respond with the list of titles, without any extra text! {cases_txt}You have previously viewed the following games: {ex_items_head}...{ex_items_tail}. Recommendations for you: {text}"}])
+                    output.append([{"role": "user", "content": f"{self.profile[i]} Based on these preferences, select {self.seq_size} games from the list below.  Return only the selected game titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously viewed games: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}"}])
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]
         if self.watched_items is None:
@@ -439,6 +469,42 @@ class SeqAgent(Agent):
             elif 'gpt' in self.args.llm:
                 self.mem[i].append(ans)
         return selected_indices
+    
+    def init_profile(self, seqs):
+        seqs = np.array(seqs.cpu())
+        org_seqs = np.vectorize(self.r_smap.get)(seqs)
+        seqs_titles = np.vectorize(self.item_info['title'].get)(org_seqs)
+        
+        def join(ts, dataset_name):
+            ts = [i[:100] for i in ts]
+            if dataset_name == 'beauty':
+                t = '| '.join(ts)
+                q = f'Previously viewed items of a user on Amazon: {t}. Describe the perference of this user in one sentence.'
+            elif dataset_name == 'ml-1m':
+                t = ', '.join(ts)
+                q = f'Previously viewed movies of a user on Movielens: {t}. Describe the perference of this user in one sentence.'
+            elif dataset_name == 'steam':
+                t = ', '.join(ts)
+                q = f'Previously viewed games of a user on STEAM: {t}. Describe the perference of this user in one sentence.'
+            return q
+        
+        text = [join(seq, self.dataset_code) for seq in seqs_titles]
+        query = [[{"role": "user", "content": q}] for q in text]
+        
+        received_data = self.send_rev(query)
+        if self.args.debug:
+            print('LLM input and output:')
+            print(query[0])
+            print(received_data[0])
+            print()
+        
+        if self.args.llm == 'llama':
+            self.profile = [ans['generation']['content'] for ans in received_data]
+        elif 'gpt' in self.args.llm:
+            self.profile = [ans['content'] for ans in received_data]
+        else:
+            raise NotImplementedError()
+        
 
 class ProfileAgent(Agent):
     def extract_json_from_text(self, text):

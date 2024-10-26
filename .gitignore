@@ -15,9 +15,8 @@ temp_*
 /.vscode/*
 /experiments/*
 /experiments.old/*
-/batch_log/*
+/batch_log*/*
 /pics/*
-/batch_log.old/*
 
 /data/*
 /gen_data/*

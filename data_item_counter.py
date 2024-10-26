@@ -35,12 +35,15 @@ def diversity(path):
 
     print(len(data))
     
-dataset_names = ['ml-1m', 'steam', 'beauty']
-for dataset_name in dataset_names:
-    print(dataset_name)
-    print("LLM")
-    diversity(f'gen_data.old/{dataset_name}/narm_5000_100/llm_seq_dataset.pkl')
-    print("Auto")
-    diversity(f'gen_data.old/{dataset_name}/narm_5000_100/autoregressive_dataset.pkl')
-    print("Org")
-    diversity(f'data/preprocessed/{dataset_name}_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
+# dataset_names = ['ml-1m', 'steam', 'beauty']
+# for dataset_name in dataset_names:
+#     print(dataset_name)
+#     print("LLM")
+#     diversity(f'gen_data.old/{dataset_name}/narm_5000_100/llm_seq_dataset.pkl')
+#     print("Auto")
+#     diversity(f'gen_data.old/{dataset_name}/narm_5000_100/autoregressive_dataset.pkl')
+#     print("Org")
+#     diversity(f'data/preprocessed/{dataset_name}_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
+# diversity(f'/data/zhaoshilong/REA_with_llm/gen_data/steam/narm_5001_100/llm_seq0_dataset.pkl')
+# diversity(f'data/preprocessed/ml-1m_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
+diversity(f'/data/zhaoshilong/REA_with_llm/gen_data/steam/narm_5001_100/autoregressive1_dataset.pkl')

@@ -96,9 +96,9 @@ archs = ['narm', 'sas', 'bert']
 #     for dataset_name in dataset_names:
 #         stat_ngram('bert', dataset_name, samplers, i)
 
-# stat_ngram(archs[0], dataset_names[1], ['self', 'autoregressive'], 2, 5001)
-stat_ngram(archs[0], dataset_names[1], ['self', 'llm_seq'], 2, 5000)
-stat_ngram(archs[0], dataset_names[1], ['self', 'llm_seq'], 2, 5001)
+stat_ngram(archs[0], dataset_names[0], ['self', 'autoregressive'], 1, 5001)
+# stat_ngram(archs[0], dataset_names[1], ['self', 'llm_seq'], 2, 5000)
+stat_ngram(archs[0], dataset_names[0], ['self', 'llm_seq'], 1, 5001)
 
 # print(compute_kl_divergence({'a':1}, {'b':1}))
 # print(compute_kl_divergence({'a':1}, {'a':0.7, 'b':0.3}))

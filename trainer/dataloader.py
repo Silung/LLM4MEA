@@ -172,7 +172,7 @@ class SASDistillationTrainingDataset(data_utils.Dataset):
             if gts is not None:
                 gt = gts[i]
             
-            for j in range(1, len(seq)):
+            for j in range(0, len(seq)-1):
                 if args.aug:
                     for k in range(0,len(seq)-j):
                         self.all_seqs += [seq[k:-j]]
@@ -181,11 +181,11 @@ class SASDistillationTrainingDataset(data_utils.Dataset):
                         if gts is not None:
                             self.all_gts += [[gt[-j-1]]]
                 else:
-                    self.all_seqs += [seq[:-j]]
-                    self.all_labels += [label[-j-1]]
-                    self.all_candidates += [candidate[-j-1]]
+                    self.all_seqs += [seq[:j+1]]
+                    self.all_labels += [label[j]]
+                    self.all_candidates += [candidate[j]]
                     if gts is not None:
-                        self.all_gts += [[gt[-j-1]]]
+                        self.all_gts += [[gt[j]]]
         if len(self.all_gts) > 0:
             assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates) == len(self.all_gts)
         else:
@@ -216,7 +216,11 @@ class SASDistillationValidationDataset(data_utils.Dataset):
             candidate = candidates[i]
             
             self.all_seqs += [seq]
-            self.all_labels += [[1] + [0] * (len(label[-1]) - 1)]
+            if args.dataset_code == 'beauty':
+                # self.all_labels += [[1] * 10 + [0] * (len(label[-1]) - 10)]
+                self.all_labels += [[1/(w+1) for w in range(len(label[-1]))]]
+            else:
+                self.all_labels += [[1] + [0] * (len(label[-1]) - 1)]
             self.all_candidates += [candidate[-1]]
 
         assert len(self.all_seqs) == len(self.all_labels) == len(self.all_candidates)
