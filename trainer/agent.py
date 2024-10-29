@@ -126,11 +126,29 @@ class Agent():
                 print(f"Submit at {current_time}\t Submit batch task: {self.args.dataset_code}-{self.args.bb_model_code}-{batch_info.id}")
 
                 # batch_input_file_id = 'batch_6704f47a53948190bd447a82ec4b7e64'
+                retry_cc = 0
                 while True:
                     try:
                         response = client.batches.retrieve(batch_info.id)
                         if response.status == 'completed':
                             break
+                        elif response.status == 'expired':
+                            batch_input_file = client.files.create(file=open(batch_input_path, "rb"), purpose="batch")
+                            batch_input_file_id = batch_input_file.id
+
+                            batch_info = client.batches.create(
+                                input_file_id=batch_input_file_id,
+                                endpoint="/v1/chat/completions",
+                                completion_window="24h",
+                                metadata={
+                                "description": f"{self.args.dataset_code}-{self.args.bb_model_code}"
+                                }
+                                )
+                            time.sleep(10)
+                            retry_cc += 1
+                            current_time = datetime.now().strftime("%H:%M:%S")
+                            retry_prompt = f'Retry {retry_cc}, ' if retry_cc > 0 else ''
+                            print(f"{retry_prompt}Submit at {current_time}\t Submit batch task: {self.args.dataset_code}-{self.args.bb_model_code}-{batch_info.id}")
                         elif response.status in ['failed', 'expired', 'cancelling', 'cancelled']:
                             print(f'API error code: {response.status}')
                             raise NotImplementedError()
