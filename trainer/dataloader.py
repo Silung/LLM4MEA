@@ -2,6 +2,7 @@ import torch
 import torch.utils.data as data_utils
 
 import random
+import math
 from .dataset import *
 
 DIS_DATASETS = {
@@ -220,7 +221,9 @@ class SASDistillationValidationDataset(data_utils.Dataset):
             
             self.all_seqs += [seq]
             if args.val_strategy == 'decay':
+                # self.all_labels += [[1/(math.log(w+2)) for w in range(len(label[-1]))]]
                 self.all_labels += [[1/(w+1) for w in range(len(label[-1]))]]
+                # self.all_labels += [[1/(w+1) for w in range(10)] + [0] * (len(label[-1]) - 10)]
             else:
                 self.all_labels += [[1] + [0] * (len(label[-1]) - 1)]
             self.all_candidates += [candidate[-1]]

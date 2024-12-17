@@ -3,7 +3,7 @@ import json
 import numpy as np
 
 a1 = ['narm', 'sas', 'bert']
-a2 = ['ml-1m', 'steam', 'beauty']
+a2 = ['games', 'steam', 'beauty']
 a3 = ['NDCG@10', 'Recall@10', 'Agr@1', 'Agr@10']
 a4 = ['target', 'self', 'random', 'autoregressive', 'llm_seq']
 a1map = {'narm':'NARM', 'sas':'SASRec', 'bert':'BERT'}

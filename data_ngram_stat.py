@@ -8,19 +8,22 @@ import torch
 import matplotlib.pyplot as plt
 
 
-def load_data(arch, dataset_name, sampler, seq_num=5000):
+def load_data(arch, dataset_name, sampler, seq_num=5000, id=0):
     distill_dir = "/data/zhaoshilong/REA_with_llm"
 
     root = f'{distill_dir}/gen_data/{dataset_name}/{arch}_{seq_num}_100'
 
-    for i in range(5):
-        path = f'{sampler}{i}_dataset.pkl'
-        try:
-            with open(os.path.join(root, path), 'rb') as f:
-                dataset = pickle.load(f)
-            break
-        except:
-            continue
+    # for i in range(5):
+    #     path = f'{sampler}{i}_dataset.pkl'
+    #     try:
+    #         with open(os.path.join(root, path), 'rb') as f:
+    #             dataset = pickle.load(f)
+    #         break
+    #     except:
+    #         continue
+    path = f'{sampler}{id}_dataset.pkl'
+    with open(os.path.join(root, path), 'rb') as f:
+        dataset = pickle.load(f)
     seqs = dataset['seqs']
     return seqs
 
@@ -51,16 +54,21 @@ def ngram_distribution(ngrams):
 
 def stat_ngram(arch, dataset_name, samplers, n, seq_num=5000):
     print(f'arch={arch}\tdataset_name={dataset_name}\tn={n}')
-    seqs1 = load_data(arch, dataset_name, samplers[0])
+    seqs1 = load_data(arch, dataset_name, samplers[0], 5001)
     ngrams1 = extract_ngrams(seqs1, n)
     p_dist = ngram_distribution(ngrams1)
-
-    for sampler in samplers[1:]:
-        seqs2 = load_data(arch, dataset_name, sampler, seq_num)
-        ngrams2 = extract_ngrams(seqs2, n)
-        q_dist = ngram_distribution(ngrams2)
-        kl_divergence = compute_kl_divergence(p_dist, q_dist)
-        print(f'p:{samplers[0]}\t q:{sampler}\t\t kl:{kl_divergence}')
+    # kl_divergence = compute_kl_divergence(p_dist, p_dist)
+    # print(f'p:{samplers[0]}\t q:{samplers[0]}\t\t kl:{kl_divergence}')
+    
+    try:
+        for sampler in samplers[1:]:
+            seqs2 = load_data(arch, dataset_name, sampler, seq_num, id=30)
+            ngrams2 = extract_ngrams(seqs2, n)
+            q_dist = ngram_distribution(ngrams2)
+            kl_divergence = compute_kl_divergence(p_dist, q_dist)
+            print(f'p:{samplers[0]}\t q:{sampler}\t\t kl:{kl_divergence}')
+    except:
+        print("Error.")
 
 def plot_1gram_distribution(arch, dataset_name, sampler, seq_num=5000, color='blue', ylim=None):
     sequences = load_data(arch, dataset_name, sampler, seq_num)
@@ -88,17 +96,27 @@ def plot_1gram_distribution(arch, dataset_name, sampler, seq_num=5000, color='bl
     plt.savefig(f'pics/{arch}-{dataset_name}-{sampler}-{seq_num}_1-gram_distribution.png')
 
 
-samplers = ['self', 'random', 'autoregressive', 'llm_seq']
-dataset_names = ['ml-1m', 'steam', 'beauty']
+samplers = ['self', 'autoregressive', 'llm_seq']
+dataset_names = ['ml-1m', 'steam', 'beauty', 'games']
 archs = ['narm', 'sas', 'bert']
 
 # for i in range(1,4):
 #     for dataset_name in dataset_names:
 #         stat_ngram('bert', dataset_name, samplers, i)
 
-stat_ngram(archs[0], dataset_names[0], ['self', 'autoregressive'], 1, 5001)
+# stat_ngram(archs[2], dataset_names[1], ['self', 'random'], 1, 5001)
+# stat_ngram(archs[2], dataset_names[1], ['self', 'random'], 2, 5001)
+# stat_ngram(archs[2], dataset_names[2], ['self', 'random'], 1, 5001)
+# stat_ngram(archs[2], dataset_names[2], ['self', 'random'], 2, 5001)
+# stat_ngram(archs[2], dataset_names[3], ['self', 'random'], 1, 5001)
+# stat_ngram(archs[2], dataset_names[3], ['self', 'random'], 2, 5001)
 # stat_ngram(archs[0], dataset_names[1], ['self', 'llm_seq'], 2, 5000)
-stat_ngram(archs[0], dataset_names[0], ['self', 'llm_seq'], 1, 5001)
+stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq'], 1, 5001)
+stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq'], 2, 5001)
+stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq'], 1, 5001)
+stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq'], 2, 5001)
+stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq'], 1, 5001)
+stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq'], 2, 5001)
 
 # print(compute_kl_divergence({'a':1}, {'b':1}))
 # print(compute_kl_divergence({'a':1}, {'a':0.7, 'b':0.3}))

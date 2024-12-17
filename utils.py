@@ -196,7 +196,7 @@ parser.add_argument('--bert_mask_prob', type=float, default=0.2)
 # Distillation & Retraining
 ################
 parser.add_argument('--num_generated_seqs', type=int, default=5000)
-parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'llm_pfl', 'mix', 'llm_exam', 'llm_seq', 'llm_seq_test', 'self'])
+parser.add_argument('--generated_sampler', type=str, default='autoregressive', choices=['random', 'autoregressive', 'adversarial', 'llm', 'random_llm', 'llm_pfl', 'mix', 'llm_exam', 'llm_seq', 'llm_seq_test', 'self'])
 parser.add_argument('-k', type=int, default=100)
 parser.add_argument('--num_original_seqs', type=int, default=0)
 parser.add_argument('--num_poisoned_seqs', type=int, default=100)
@@ -222,7 +222,7 @@ parser.add_argument('--attack_mode', type=str, default='wb_grad', choices=['wb_g
 parser.add_argument('--id', type=str, default='')
 parser.add_argument('--cases_path', type=str, default=None)
 parser.add_argument('--port', type=int, default=1960)
-parser.add_argument('--shuffle', action="store_true")
+parser.add_argument('--no_shuffle', action="store_true")
 parser.add_argument('--gen_data_only', action="store_true")
 # parser.add_argument('--completion', action="store_true")
 parser.add_argument('--few_shot', type=int, default=0)
@@ -230,7 +230,7 @@ parser.add_argument('--debug', action="store_true")
 parser.add_argument('--noise', action="store_true")
 parser.add_argument('--resume', action="store_true")
 parser.add_argument('--aug', action="store_true")
-parser.add_argument('--llm', type=str, default='llama', choices=['llama', 'gpt-4o-mini_batch', 'gpt-test'])
+parser.add_argument('--llm', type=str, default='llama', choices=['llama', 'gpt-4o-mini_batch', 'gpt-4o-mini_batch_azure','gpt-test'])
 parser.add_argument('--val_strategy', type=str, default='top1', choices=['top1', 'decay'])
 
 

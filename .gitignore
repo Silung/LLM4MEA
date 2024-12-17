@@ -7,6 +7,7 @@
 *.pdf
 *.docx
 *.pptx
+*.gz
 .DS_Store
 temp.*
 temp_*
@@ -16,7 +17,9 @@ temp_*
 /experiments/*
 /experiments.old/*
 /batch_log*/*
-/pics/*
+/pics
+*.npy
+*.txt
 
 /data/*
 /gen_data/*

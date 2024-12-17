@@ -47,3 +47,36 @@ def diversity(path):
 # diversity(f'/data/zhaoshilong/REA_with_llm/gen_data/steam/narm_5001_100/llm_seq0_dataset.pkl')
 # diversity(f'data/preprocessed/ml-1m_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
 diversity(f'/data/zhaoshilong/REA_with_llm/gen_data/steam/narm_5001_100/autoregressive1_dataset.pkl')
+
+
+def info(path):
+    print(f'Path: {path}')
+    with open(path, 'rb') as f:
+        dataset = pickle.load(f)
+        
+    user_cc = len(dataset['train'])
+    print(f'Users: {user_cc}')
+    
+    cc = []
+    max_len = -1
+    for k, v in dataset['train'].items():
+        cc += v
+        max_len = max(max_len, len(v))
+    for k, v in dataset['val'].items():
+        cc += v
+        max_len = max(max_len, len(v))
+    for k, v in dataset['test'].items():
+        cc += v
+        max_len = max(max_len, len(v))
+    data = set(cc)
+    item_cc = len(data)
+    print(f'Items: {item_cc}')
+    print(f'Interaction: {len(cc)}')
+    print(f'avg len: {len(cc)/user_cc}')
+    print(f'max len: {max_len}')
+    print(f'Sparsity: {1 -  len(cc)/ (item_cc*user_cc)}')
+    return data
+
+info(f'data/preprocessed/beauty_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
+info(f'data/preprocessed/games_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
+info(f'data/preprocessed/steam_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')

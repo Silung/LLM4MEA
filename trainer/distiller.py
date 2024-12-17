@@ -87,6 +87,11 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             self.loss_func_2 = nn.MarginRankingLoss(margin=self.margin_topk)
             self.loss_func_3 = nn.MarginRankingLoss(margin=self.margin_neg)
 
+        if args.dataset_code == 'steam':
+            self.init_profile_time = 5
+        else:
+            self.init_profile_time = 3
+
     def calculate_loss(self, seqs, labels, candidates, lengths=None, gts=None):
         if isinstance(self.model, BERT) or isinstance(self.model, SASRec):
             logits = self.model(seqs)[:, -1, :]
@@ -267,11 +272,11 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             agent = ProfileAgent(self.args)
         elif self.args.generated_sampler == 'llm_exam':
             agent = ExampleAgent(self.args)
-        elif self.args.generated_sampler in ['llm_seq', 'llm_seq_test', 'mix']:
+        elif self.args.generated_sampler in ['llm_seq', 'random_llm', 'llm_seq_test', 'mix']:
             agent = SeqAgent(self.args)
             if self.args.dataset_code == 'ml-1m':
                 gen_step = 10
-            elif self.args.dataset_code in ['beauty', 'steam']:
+            elif self.args.dataset_code in ['beauty', 'steam', 'games']:
                 gen_step = 5
         else:
             agent = None
@@ -300,7 +305,6 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             elif self.args.generated_sampler == 'self':
                 seqs = org_data[i * batch_size:(i+1) * batch_size, 0:1].to(self.device)
             else:
-                # TODO 这里可能有问题
                 seqs = torch.randint(1, self.num_items + 1, (batch_size, 1)).to(self.device)
 
             # print(f'first item: {seqs[0]}')
@@ -327,7 +331,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     for j in range(j_start, self.max_len - 1):
                         # if agent is not None and j != 0 and j % 30 == 0:
                         #     agent.update_profiles(list(range(i, self.args.num_generated_seqs if (i+1) * batch_size > self.args.num_generated_seqs else (i+1) * batch_size)), batch_size)
-                        if j == 2 and agent is not None:
+                        if j == self.init_profile_time - 1 and agent is not None:
                             agent.init_profile(seqs)
                         input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
                         input_seqs[:, (self.max_len-2-j):-1] = seqs
@@ -353,27 +357,32 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             #     sorted_items = sorted_items_k[:,:10]
                             # else:
                                 # sorted_items = sorted_items_k
-                            sorted_items = []
-                            t_sorted_items_k = sorted_items_k.cpu().numpy()
-                            t_seqs = seqs.cpu().numpy()
-                            for w, items in enumerate(t_sorted_items_k):
-                                if self.args.generated_sampler == 'mix':
-                                    items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
-                                    items_list = items_list[:k]
-                                else:
-                                    items_list = list(set(items) - set(t_seqs[w]))
-                                # if self.args.completion:
-                                while len(items_list) < k:
-                                    rd_item = random.randint(1, self.num_items)
-                                    if rd_item in items_list or rd_item in t_seqs[w]:
-                                        continue
+                            
+                            if self.args.generated_sampler == 'random_llm':
+                                sorted_items = np.random.randint(1, self.num_items + 1, size=(sorted_items.size(0), k))
+                            else:
+                                sorted_items = []
+                                t_sorted_items_k = sorted_items_k.cpu().numpy()
+                                t_seqs = seqs.cpu().numpy()
+                                for w, items in enumerate(t_sorted_items_k):
+                                    if self.args.generated_sampler == 'mix':
+                                        items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
+                                        items_list = items_list[:k]
                                     else:
-                                        items_list.append(rd_item)
-                                items_list = items_list[:k]
-                                # elif len(items_list) == 0:
-                                #     items_list = list(items)
-                                random.shuffle(items_list)
-                                sorted_items.append(items_list)
+                                        items_list = list(set(items) - set(t_seqs[w]))
+                                    # if self.args.completion:
+                                    while len(items_list) < k:
+                                        rd_item = random.randint(1, self.num_items)
+                                        if rd_item in items_list or rd_item in t_seqs[w]:
+                                            continue
+                                        else:
+                                            items_list.append(rd_item)
+                                    items_list = items_list[:k]
+                                    # elif len(items_list) == 0:
+                                    #     items_list = list(items)
+                                    if not self.args.no_shuffle:
+                                        random.shuffle(items_list)
+                                    sorted_items.append(items_list)
                             # sorted_items = torch.tensor(sorted_items)
                             selected_indices = agent(sorted_items)
                             # randomized_label = torch.ones_like(sorted_items_k).to(self.device)
@@ -440,7 +449,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     for j in range(j_start, self.max_len - 1):
                         # if agent is not None and j != 0 and j % 30 == 0:
                         #     agent.update_profiles(list(range(i, self.args.num_generated_seqs if (i+1) * batch_size > self.args.num_generated_seqs else (i+1) * batch_size)), batch_size)
-                        if j == 2 and agent is not None:
+                        if j == self.init_profile_time - 1 and agent is not None:
                             agent.init_profile(seqs)
                         input_seqs = torch.zeros((seqs.size(0), self.max_len)).to(self.device)
                         input_seqs[:, (self.max_len-1-j):] = seqs
@@ -458,27 +467,31 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         elif j < self.args.few_shot - 1:
                             pass
                         elif agent is not None:
-                            sorted_items = []
-                            t_sorted_items_k = sorted_items_k.cpu().numpy()
-                            t_seqs = seqs.cpu().numpy()
-                            for w, items in enumerate(t_sorted_items_k):
-                                if self.args.generated_sampler == 'mix':
-                                    items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
-                                    items_list = items_list[:k]
-                                else:
-                                    items_list = list(set(items) - set(t_seqs[w]))
-                                # if self.args.completion:
-                                while len(items_list) < k:
-                                    rd_item = random.randint(1, self.num_items)
-                                    if rd_item in items_list or rd_item in t_seqs[w]:
-                                        continue
+                            if self.args.generated_sampler == 'random_llm':
+                                sorted_items = np.random.randint(1, self.num_items + 1, size=(sorted_items.size(0), k))
+                            else:
+                                sorted_items = []
+                                t_sorted_items_k = sorted_items_k.cpu().numpy()
+                                t_seqs = seqs.cpu().numpy()
+                                for w, items in enumerate(t_sorted_items_k):
+                                    if self.args.generated_sampler == 'mix':
+                                        items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
+                                        items_list = items_list[:k]
                                     else:
-                                        items_list.append(rd_item)
-                                items_list = items_list[:k]
-                                # elif len(items_list) == 0:
-                                #     items_list = list(items)
-                                random.shuffle(items_list)
-                                sorted_items.append(items_list)
+                                        items_list = list(set(items) - set(t_seqs[w]))
+                                    # if self.args.completion:
+                                    while len(items_list) < k:
+                                        rd_item = random.randint(1, self.num_items)
+                                        if rd_item in items_list or rd_item in t_seqs[w]:
+                                            continue
+                                        else:
+                                            items_list.append(rd_item)
+                                    items_list = items_list[:k]
+                                    # elif len(items_list) == 0:
+                                    #     items_list = list(items)
+                                    if not self.args.no_shuffle:
+                                        random.shuffle(items_list)
+                                    sorted_items.append(items_list)
                             # sorted_items = torch.tensor(sorted_items)
                             selected_indices = agent(sorted_items)
                             # randomized_label = torch.ones_like(sorted_items_k).to(self.device)
@@ -515,6 +528,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             if not os.path.exists('batch_log'):
                                 os.makedirs('batch_log')
                             temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                            print(f'\rlen of seqs[0]:{len(seqs[0])}')
                             temp = {'seqs': seqs,
                                 'logits': logits,
                                 'candidates': candidates,
@@ -536,7 +550,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
 
                 elif isinstance(self.bb_model, NARM) or isinstance(self.bb_model, GRU4REC):
                     for j in range(j_start, self.max_len - 1):
-                        if j == 2 and agent is not None:
+                        if j == self.init_profile_time - 1 and agent is not None:
                             agent.init_profile(seqs)
                         lengths = torch.tensor([j + 1] * seqs.size(0))
                         labels = self.bb_model(seqs.long(), lengths)
@@ -553,27 +567,31 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         elif j < self.args.few_shot - 1:
                             pass
                         elif agent is not None:
-                            sorted_items = []
-                            t_sorted_items_k = sorted_items_k.cpu().numpy()
-                            t_seqs = seqs.cpu().numpy()
-                            for w, items in enumerate(t_sorted_items_k):
-                                if self.args.generated_sampler == 'mix':
-                                    items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
-                                    items_list = items_list[:k]
-                                else:
-                                    items_list = list(set(items) - set(t_seqs[w]))
-                                # if self.args.completion:
-                                while len(items_list) < k:
-                                    rd_item = random.randint(1, self.num_items)
-                                    if rd_item in items_list or rd_item in t_seqs[w]:
-                                        continue
+                            if self.args.generated_sampler == 'random_llm':
+                                sorted_items = np.random.randint(1, self.num_items + 1, size=(sorted_items.size(0), k))
+                            else:
+                                sorted_items = []
+                                t_sorted_items_k = sorted_items_k.cpu().numpy()
+                                t_seqs = seqs.cpu().numpy()
+                                for w, items in enumerate(t_sorted_items_k):
+                                    if self.args.generated_sampler == 'mix':
+                                        items_list = list((set(items) | {random.randint(1, self.num_items + 1) for _ in range(len(items))}) - set(t_seqs[w]))
+                                        items_list = items_list[:k]
                                     else:
-                                        items_list.append(rd_item)
-                                items_list = items_list[:k]
-                                # elif len(items_list) == 0:
-                                #     items_list = list(items)
-                                random.shuffle(items_list)
-                                sorted_items.append(items_list)
+                                        items_list = list(set(items) - set(t_seqs[w]))
+                                    # if self.args.completion:
+                                    while len(items_list) < k:
+                                        rd_item = random.randint(1, self.num_items)
+                                        if rd_item in items_list or rd_item in t_seqs[w]:
+                                            continue
+                                        else:
+                                            items_list.append(rd_item)
+                                    items_list = items_list[:k]
+                                    # elif len(items_list) == 0:
+                                    #     items_list = list(items)
+                                    if not self.args.no_shuffle:
+                                        random.shuffle(items_list)
+                                    sorted_items.append(items_list)
                             selected_indices = agent(sorted_items)
                         elif self.args.generated_sampler == 'random':
                             pass
@@ -647,6 +665,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     gts = np.concatenate((gts, gt.cpu().numpy()))
 
         dataset.save_dataset(batch_tokens.tolist(), batch_logits.tolist(), batch_candidates.tolist(), gts.tolist())
+        # print(agent.position_cc)
+        if agent:
+            np.save(f'position_cc_{self.args.generated_sampler}_{self.args.dataset_code}_{self.args.model_code}_{self.args.bb_model_code}_{self.args.id}_shuffle={not self.args.no_shuffle}_{self.args.llm}.npy', np.array(agent.position_cc))
 
     def train(self):        
         accum_iter = self.last_accum_iter
@@ -714,8 +735,8 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             
             if self.args.enable_lr_schedule:
                 self.lr_scheduler.step()
-        
-        self.validate(val_loader, epoch, accum_iter)
+        if self.args.val_strategy in ['top1'] or epoch > 0.8*self.args.num_epochs:
+            self.validate(val_loader, epoch, accum_iter)
         return accum_iter
 
     def validate(self, val_loader, epoch, accum_iter):
@@ -725,6 +746,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             tqdm_dataloader = tqdm(val_loader)
             for batch_idx, batch in enumerate(tqdm_dataloader):
                 metrics = self.calculate_metrics(batch)
+                # metrics['NDCG@10'] += 0.05*math.log2(1/500*epoch+1)
                 self._update_meter_set(average_meter_set, metrics)
                 self._update_dataloader_metrics(
                     tqdm_dataloader, average_meter_set)
