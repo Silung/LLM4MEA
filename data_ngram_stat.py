@@ -52,23 +52,56 @@ def ngram_distribution(ngrams):
     ngram_count = Counter(ngrams)
     return {ngram: count / total_count for ngram, count in ngram_count.items()}
 
+def draw_fig(p, name):
+    # 解包元组的第一个元素并按照键进行排序
+    # sorted_items = sorted(p.items(), key=lambda x: x[0][0])  # 按键排序
+    q = {k[0]:v for k,v in p.items()}
+    keys = []
+    values = []
+    for i in range(1,501):
+        keys.append(i)
+        values.append(q.get(i,0))
+
+    # 绘制分布图
+    plt.figure(figsize=(8, 5))
+    plt.bar(keys, values, color="skyblue", edgecolor="black")
+
+    # 添加标题和坐标轴标签
+    plt.title("Distribution Plot")
+    plt.xlabel("Keys")
+    plt.ylabel("Values")
+
+    # 显示图
+    plt.savefig(f'pics/distribution_{name}.pdf')
+
 def stat_ngram(arch, dataset_name, samplers, n, seq_num=5000):
     print(f'arch={arch}\tdataset_name={dataset_name}\tn={n}')
     seqs1 = load_data(arch, dataset_name, samplers[0], 5001)
     ngrams1 = extract_ngrams(seqs1, n)
     p_dist = ngram_distribution(ngrams1)
+    # draw_fig(p_dist, 'self')
     # kl_divergence = compute_kl_divergence(p_dist, p_dist)
     # print(f'p:{samplers[0]}\t q:{samplers[0]}\t\t kl:{kl_divergence}')
     
-    try:
-        for sampler in samplers[1:]:
-            seqs2 = load_data(arch, dataset_name, sampler, seq_num, id=30)
+
+    for sampler in samplers[1:]:
+        try:
+            seqs2 = load_data(arch, dataset_name, sampler, seq_num, id=0)
             ngrams2 = extract_ngrams(seqs2, n)
+            if sampler == 'llm_seq':
+                ts = []
+                for i in range(1,54543):
+                    t = tuple((i,))
+                    if t not in ngrams2:
+                        ts.append(t)
+                print(len(ts))
+                ngrams2 += ts
             q_dist = ngram_distribution(ngrams2)
+            # draw_fig(q_dist, sampler)
             kl_divergence = compute_kl_divergence(p_dist, q_dist)
             print(f'p:{samplers[0]}\t q:{sampler}\t\t kl:{kl_divergence}')
-    except:
-        print("Error.")
+        except:
+            print("Error.")
 
 def plot_1gram_distribution(arch, dataset_name, sampler, seq_num=5000, color='blue', ylim=None):
     sequences = load_data(arch, dataset_name, sampler, seq_num)
@@ -111,12 +144,12 @@ archs = ['narm', 'sas', 'bert']
 # stat_ngram(archs[2], dataset_names[3], ['self', 'random'], 1, 5001)
 # stat_ngram(archs[2], dataset_names[3], ['self', 'random'], 2, 5001)
 # stat_ngram(archs[0], dataset_names[1], ['self', 'llm_seq'], 2, 5000)
-stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq'], 1, 5001)
-stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq'], 2, 5001)
-stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq'], 1, 5001)
-stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq'], 2, 5001)
-stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq'], 1, 5001)
-stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq'], 2, 5001)
+stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 1, 5001)
+# stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
+stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 1, 5001)
+# stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
+stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 1, 5001)
+# stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
 
 # print(compute_kl_divergence({'a':1}, {'b':1}))
 # print(compute_kl_divergence({'a':1}, {'a':0.7, 'b':0.3}))

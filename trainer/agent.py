@@ -278,6 +278,7 @@ class Agent():
                 for i, (k, v) in enumerate(id2msg.items()):
                     cc_try = 0
                     while ('content' not in v or v['content'] is None or '[]' in v['content']) and cc_try < 6:
+                    # while ('content' not in v or v['content'] is None) and cc_try < 6:
                         cc_try += 1
                         m = msg[int(k.split('-')[-1])]
                         while True:
@@ -291,6 +292,7 @@ class Agent():
                         print(f"Update {k}.")
                         time.sleep(15)
                     if cc_try == 6:
+                        continue
                         print(msg[int(k.split('-')[-1])])
                         print("Answer:")
                         v = {'content': str(input()), 'role': 'assistant'}
