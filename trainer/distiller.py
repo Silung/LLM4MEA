@@ -91,6 +91,8 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             self.init_profile_time = 5
         else:
             self.init_profile_time = 3
+            
+        self.left_items = set(range(1, self.num_items+1))
 
     def calculate_loss(self, seqs, labels, candidates, lengths=None, gts=None):
         if isinstance(self.model, BERT) or isinstance(self.model, SASRec):
@@ -302,10 +304,12 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                 seqs = org_data[i * batch_size:(i+1) * batch_size, rand_base:rand_base+1].to(self.device)
                 if agent is not None:
                     agent.set_history(org_data[i * batch_size:(i+1) * batch_size, rand_base:rand_base+self.args.few_shot])
+                self.left_items = self.left_items - set(seqs.reshape(-1).cpu().tolist())
             elif self.args.generated_sampler == 'self':
                 seqs = org_data[i * batch_size:(i+1) * batch_size, 0:1].to(self.device)
             else:
                 seqs = torch.randint(1, self.num_items + 1, (batch_size, 1)).to(self.device)
+                self.left_items = self.left_items - set(seqs.reshape(-1).cpu().tolist())
 
             # print(f'first item: {seqs[0]}')
             
@@ -394,12 +398,24 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         
                         if j < self.args.few_shot - 1:
                             seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].to(self.device)), 1)
+                            self.left_items = self.left_items - set(org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].reshape(-1).cpu().tolist())
                         else:
                             if gen_step != 1:
                                 if len(temp_seq[0]) == 0:
                                     row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
                                     temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
-                                seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
+                                    self.left_items = self.left_items - set(temp_seq.reshape(-1).cpu().tolist())
+                                
+                                if self.args.generated_sampler == 'llm_softmix':
+                                    if sorted_items_k.size(0) > len(self.left_items):
+                                        horizon_expanders = random.randint(1, self.num_items)
+                                    else:
+                                        horizon_expanders = random.sample(self.left_items, sorted_items_k.size(0))
+                                        self.left_items = self.left_items - set(horizon_expanders)
+                                    horizon_expanders = torch.tensor(horizon_expanders).to(self.device).reshape(sorted_items_k.size(0), 1)
+                                    seqs = torch.cat((seqs, temp_seq[:, :1], horizon_expanders), 1)
+                                else:
+                                    seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
                                 temp_seq = temp_seq[:, 1:]
                             elif self.args.generated_sampler == 'random':
                                 seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
@@ -408,7 +424,8 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             else:
                                 row_indices = torch.arange(sorted_items_k.size(0))
                                 seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
-
+                                self.left_items = self.left_items - set(sorted_items_k[row_indices, selected_indices].reshape(-1).cpu().tolist())
+                                
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
                             candidates = torch.cat((candidates, sorted_items_k.unsqueeze(1)), 1)
@@ -502,12 +519,25 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         
                         if j < self.args.few_shot - 1:
                             seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].to(self.device)), 1)
+                            self.left_items = self.left_items - set(org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].reshape(-1).cpu().tolist())
                         else:
                             if gen_step != 1:
                                 if len(temp_seq[0]) == 0:
                                     row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
                                     temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
-                                seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
+                                    self.left_items = self.left_items - set(temp_seq.reshape(-1).cpu().tolist())
+
+                                if self.args.generated_sampler == 'llm_softmix':
+                                    if sorted_items_k.size(0) > len(self.left_items):
+                                        horizon_expanders = random.randint(1, self.num_items)
+                                    else:
+                                        horizon_expanders = random.sample(self.left_items, sorted_items_k.size(0))
+                                        self.left_items = self.left_items - set(horizon_expanders)
+                                            
+                                    horizon_expanders = torch.tensor(horizon_expanders).to(self.device).reshape(sorted_items_k.size(0), -1)
+                                    seqs = torch.cat((seqs, temp_seq[:, :1], horizon_expanders), 1)
+                                else:
+                                    seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
                                 temp_seq = temp_seq[:, 1:]
                             elif self.args.generated_sampler == 'random':
                                 seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
@@ -516,7 +546,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             else:
                                 row_indices = torch.arange(sorted_items_k.size(0))
                                 seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
-
+                                self.left_items = self.left_items - set(sorted_items_k[row_indices, selected_indices].reshape(-1).cpu().tolist())
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
                             candidates = torch.cat((candidates, sorted_items_k.unsqueeze(1)), 1)
@@ -550,6 +580,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
 
                 elif isinstance(self.bb_model, NARM) or isinstance(self.bb_model, GRU4REC):
                     for j in range(j_start, self.max_len - 1):
+                        print(f'temp_seq len ={len(temp_seq)}')
                         if j == self.init_profile_time - 1 and agent is not None:
                             agent.init_profile(seqs)
                         lengths = torch.tensor([j + 1] * seqs.size(0))
@@ -600,12 +631,25 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                         
                         if j < self.args.few_shot - 1:
                             seqs = torch.cat((seqs, org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].to(self.device)), 1)
+                            self.left_items = self.left_items - set(org_data[i * batch_size:(i+1) * batch_size][:, rand_base+j+1:rand_base+j+2].reshape(-1).cpu().tolist())
                         else:
                             if gen_step != 1:
                                 if len(temp_seq[0]) == 0:
                                     row_indices = torch.tensor([[i]*gen_step for i in range(sorted_items_k.size(0))])
                                     temp_seq = sorted_items_k[row_indices, selected_indices].to(self.device)
-                                seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
+                                    self.left_items = self.left_items - set(temp_seq.reshape(-1).cpu().tolist())
+                                
+                                if self.args.generated_sampler == 'llm_softmix':
+                                    if sorted_items_k.size(0) > len(self.left_items):
+                                        horizon_expanders = random.randint(1, self.num_items)
+                                    else:
+                                        horizon_expanders = random.sample(self.left_items, sorted_items_k.size(0))
+                                        self.left_items = self.left_items - set(horizon_expanders)
+                                    
+                                    horizon_expanders = torch.tensor(horizon_expanders).to(self.device).reshape(sorted_items_k.size(0), 1)
+                                    seqs = torch.cat((seqs, temp_seq[:, :1], horizon_expanders), 1)
+                                else:
+                                    seqs = torch.cat((seqs, temp_seq[:, :1]), 1)
                                 temp_seq = temp_seq[:, 1:]
                             elif self.args.generated_sampler == 'random':
                                 seqs = torch.cat((seqs, random_tokens[:, j].unsqueeze(1).to(self.device)), 1)
@@ -614,7 +658,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             else:
                                 row_indices = torch.arange(sorted_items_k.size(0))
                                 seqs = torch.cat((seqs, sorted_items_k[row_indices, selected_indices].unsqueeze(1).to(self.device)), 1)
-                        
+                                self.left_items = self.left_items - set(sorted_items_k[row_indices, selected_indices].reshape(-1).cpu().tolist())
                         try:
                             logits = torch.cat((logits, randomized_label.unsqueeze(1)), 1)
                             candidates = torch.cat((candidates, sorted_items_k.unsqueeze(1)), 1)
@@ -776,7 +820,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     tqdm_dataloader, average_meter_set)
 
             average_metrics = average_meter_set.averages()
-            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{int(time.time())}.json'), 'w') as f:
+            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{self.args.id}_{int(time.time())}.json'), 'w') as f:
                 json.dump(average_metrics, f, indent=4)
         
         return average_metrics
@@ -804,7 +848,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                     tqdm_dataloader, average_meter_set)
 
             average_metrics = average_meter_set.averages()
-            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{int(time.time())}.json'), 'w') as f:
+            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{self.args.id}_{int(time.time())}.json'), 'w') as f:
                 json.dump(average_metrics, f, indent=4)
         
         return average_metrics

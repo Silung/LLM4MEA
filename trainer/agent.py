@@ -220,7 +220,7 @@ class Agent():
                             "description": f"{self.args.dataset_code}-{self.args.bb_model_code}"
                             }
                             )
-                        time.sleep(10)
+                        time.sleep(120)
 
                         current_time = datetime.now().strftime("%H:%M:%S")
                         print(f"Submit at {current_time}\t Submit batch task: {self.args.dataset_code}-{self.args.bb_model_code}-{batch_info.id}")
@@ -249,7 +249,7 @@ class Agent():
                                 "description": f"{self.args.dataset_code}-{self.args.bb_model_code}"
                                 }
                                 )
-                            time.sleep(10)
+                            time.sleep(120)
                             retry_cc += 1
                             current_time = datetime.now().strftime("%H:%M:%S")
                             retry_prompt = f'Retry {retry_cc}, ' if retry_cc > 0 else ''

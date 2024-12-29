@@ -88,14 +88,14 @@ def stat_ngram(arch, dataset_name, samplers, n, seq_num=5000):
         try:
             seqs2 = load_data(arch, dataset_name, sampler, seq_num, id=0)
             ngrams2 = extract_ngrams(seqs2, n)
-            if sampler == 'llm_seq':
-                ts = []
-                for i in range(1,54543):
-                    t = tuple((i,))
-                    if t not in ngrams2:
-                        ts.append(t)
-                print(len(ts))
-                ngrams2 += ts
+            # if sampler == 'llm_seq':
+            #     ts = []
+            #     for i in range(1,54543):
+            #         t = tuple((i,))
+            #         if t not in ngrams2:
+            #             ts.append(t)
+            #     print(len(ts))
+            #     ngrams2 += ts
             q_dist = ngram_distribution(ngrams2)
             # draw_fig(q_dist, sampler)
             kl_divergence = compute_kl_divergence(p_dist, q_dist)
@@ -145,11 +145,11 @@ archs = ['narm', 'sas', 'bert']
 # stat_ngram(archs[2], dataset_names[3], ['self', 'random'], 2, 5001)
 # stat_ngram(archs[0], dataset_names[1], ['self', 'llm_seq'], 2, 5000)
 stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 1, 5001)
-# stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
+stat_ngram(archs[0], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
 stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 1, 5001)
-# stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
+stat_ngram(archs[1], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
 stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 1, 5001)
-# stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
+stat_ngram(archs[2], dataset_names[2], ['self', 'llm_seq', 'autoregressive', 'random'], 2, 5001)
 
 # print(compute_kl_divergence({'a':1}, {'b':1}))
 # print(compute_kl_divergence({'a':1}, {'a':0.7, 'b':0.3}))

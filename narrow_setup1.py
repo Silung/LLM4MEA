@@ -5,10 +5,25 @@ import platform
 import re
 import subprocess
 
-cmd_list = ['python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 1024 --id 30 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --no_shuffle',
-            'python distill.py --dataset_code beauty --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 512 --id 30 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --no_shuffle',
-            'python distill.py --dataset_code beauty --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 512 --id 30 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --no_shuffle']
+# cmd_list = ['python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu --no_shuffle',
+#             'python distill.py --dataset_code beauty --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu --no_shuffle',
+#             'python distill.py --dataset_code beauty --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu --no_shuffle',
+#             'python distill.py --dataset_code games --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+#             'python distill.py --dataset_code games --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+#             'python distill.py --dataset_code games --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+#             'python distill.py --dataset_code steam --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+#             'python distill.py --dataset_code steam --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+#             'python distill.py --dataset_code steam --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle']
 
+cmd_list = ['python distill.py --dataset_code beauty --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu --no_shuffle',
+            'python distill.py --dataset_code beauty --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu --no_shuffle',
+            'python distill.py --dataset_code games --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+            'python distill.py --dataset_code games --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+            'python distill.py --dataset_code games --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+            'python distill.py --dataset_code steam --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+            
+            'python distill.py --dataset_code steam --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+            'python distill.py --dataset_code steam --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle']
 def gpu_info():
     system = platform.system()
     gpus_memory = []
@@ -29,7 +44,7 @@ def narrow_setup(cmd, interval=2):
     while True:
         gpus_memorys, gpus_util = gpu_info()
         for idx, (gpu_memory, gpu_util) in enumerate(zip(gpus_memorys, gpus_util)):
-            if gpu_util > 60 or gpu_memory > 12000 :  # set waiting condition
+            if gpu_util > 30 or gpu_memory > 3000 :  # set waiting condition
                 # symbol = 'monitoring ' + '>' * idx + ' ' * (10 - i - 1) + '|'
                 # gpu_power_str = 'gpu power%d W |' % gpu_power
                 gpu_memory_str = 'gpu memory: %d MiB ' % gpu_memory

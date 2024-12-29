@@ -152,7 +152,7 @@ class SASTrainer(metaclass=ABCMeta):
                     tqdm_dataloader, average_meter_set)
 
             average_metrics = average_meter_set.averages()
-            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{int(time.time())}.json'), 'w') as f:
+            with open(os.path.join(self.export_root, 'logs', f'test_metrics_{self.args.id}_{int(time.time())}.json'), 'w') as f:
                 json.dump(average_metrics, f, indent=4)
         
         return average_metrics
