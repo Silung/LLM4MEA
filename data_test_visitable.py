@@ -14,7 +14,7 @@ def stat_org(path):
         train = train.union(v)
     
     test = set()
-    for k, v in dataset['test'].items():
+    for k, v in dataset['val'].items():
         test = test.union(v)
 
     print(len(dataset['test']))
@@ -34,8 +34,8 @@ def stat_gen(path):
     return seq
 
 
-org_train, test = stat_org('data/preprocessed/steam_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
-train = stat_gen('gen_data/steam/bert_5001_100/random0_dataset.pkl')
+org_train, test = stat_org('data/preprocessed/beauty_min_rating0-min_uc5-min_sc5-splitleave_one_out/dataset.pkl')
+train = stat_gen('gen_data/beauty/bert_5001_100/autoregressive0_dataset.pkl')
 
 print(f'item count of test: {len(test)}')
 print(len(test - train))

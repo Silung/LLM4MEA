@@ -48,7 +48,7 @@ def diversity(name, path):
             text = pickle.load(f)
         item_info = text['item']
     else:
-        raise("Not Impl..")
+        raise("Not Implemented")
 
 
     try:
@@ -83,7 +83,59 @@ def diversity(name, path):
     plt.xlabel('Diversity')
     plt.ylabel('Count')
     plt.savefig(f'pics/data_diversity_{name}.jpg')
+
+def diversity_autoregressive(name, path):
+    cc = []
+    all_items = set()
+    with open(path, 'rb') as f:
+        dataset = pickle.load(f)
+    candidates = dataset['candidates']
+    # 计算所有candidates的平均值
+    cc_all = []
+    for i in range(len(candidates)):
+        cc_i = []
+        all_items_i = set()
+        for candidate in candidates[i]:
+            div = set(candidate)
+            cc_i.append(len(div - all_items_i))
+            all_items_i = all_items_i | div
+        cc_all.append(cc_i)
     
+    # 计算每个位置的平均值
+    max_len = max(len(x) for x in cc_all)
+    cc = []
+    for i in range(max_len):
+        values = [x[i] for x in cc_all if i < len(x)]
+        cc.append(sum(values) / len(values))
+    
+    return cc
+
+def diversity_random_baseline(name):
+    # num_items = 54542  # beauty数据集的item数量
+    num_items = 13046  # steam数据集的item数量
+    target_len = 50
+    num_samples = 5000
+    
+    cc_all = []
+    for _ in range(num_samples):
+        cc_i = []
+        all_items_i = set()
+        for _ in range(target_len):
+            # 每次随机采样100个item
+            sample = set(np.random.randint(1, num_items+1, size=100))
+            # 计算新出现的item数量
+            cc_i.append(len(sample - all_items_i))
+            all_items_i = all_items_i | sample
+        cc_all.append(cc_i)
+    
+    # 计算每个位置的平均值
+    cc = []
+    for i in range(target_len):
+        values = [x[i] for x in cc_all]
+        cc.append(sum(values) / len(values))
+    
+    return cc
+
 # diversity('narm', 'gen_data/ml-1m/narm_5000_100/llm_seq_dataset.pkl.old')
 # diversity('narm-new', 'gen_data/ml-1m/narm_5000_100/llm_seq_dataset.pkl')
 # diversity('narm-ag', 'gen_data/ml-1m/narm_5000_100/autoregressive_dataset.pkl')
@@ -94,4 +146,21 @@ def diversity(name, path):
 # diversity('bert-exam', 'gen_data/ml-1m/bert_5000_100/llm_exam_dataset.pkl')
 # diversity('bert-random', 'gen_data/ml-1m/bert_5000_100/random_dataset.pkl')
 # diversity('narm-org', 'gen_data/steam/narm_5000_100/llm_seq_dataset.pkl')
-diversity('narm-ml-len=50', 'gen_data/ml-1m/narm_5000_100/llm_seq_dataset.pkl')
+# diversity('narm-ml-len=50', 'gen_data/ml-1m/narm_5000_100/llm_seq_dataset.pkl')
+# diversity_autoregressive('bert_5001_100', 'gen_data/beauty/bert_5001_100/autoregressive0_dataset.pkl')
+
+plt.figure(figsize=(10,8))
+
+cc_random = diversity_autoregressive('llm_seq', 'gen_data/steam/bert_5001_100/llm_seq50_dataset.pkl')
+cc_auto = diversity_autoregressive('autoregressive', 'gen_data/steam/bert_5001_100/autoregressive0_dataset.pkl')
+# cc_baseline = diversity_random_baseline('baseline')
+
+plt.plot(range(len(cc_random)), cc_random, color='steelblue', label='llm_seq')
+plt.plot(range(len(cc_auto)), cc_auto, color='tomato', label='Autoregressive')
+# plt.plot(range(len(cc_baseline)), cc_baseline, color='green', label='Baseline')
+
+plt.title('Diversity Comparison')
+plt.xlabel('Sequence Index')
+plt.ylabel('Diversity Count')
+plt.legend()
+plt.savefig('pics/data_diversity_comparison.jpg')
