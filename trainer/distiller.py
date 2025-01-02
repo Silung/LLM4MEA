@@ -722,6 +722,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         if self.args.gen_data_only:
             return
         dis_train_loader, dis_val_loader = dis_train_loader_factory(self.args, self.model_code, self.args.generated_sampler)
+        self.dis_train_loader = dis_train_loader
         print(f'## Distilling model via {self.args.generated_sampler} data... ##')
         # self.validate(dis_val_loader, 0, accum_iter)
         for epoch in range(self.last_epoch, self.num_epochs):
@@ -810,6 +811,11 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         
         self.model.eval()
         self.bb_model.eval()
+        if self.args.filter_unseen_items:
+            all_train_items = set()
+            for user_seq in self.dis_train_loader.dataset.all_seqs:
+                all_train_items.update(user_seq)
+            self.test_loader.dataset.filter_unseen_items(all_train_items)
         average_meter_set = AverageMeterSet()
         with torch.no_grad():
             tqdm_dataloader = tqdm(self.test_loader)

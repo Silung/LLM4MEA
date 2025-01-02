@@ -81,7 +81,16 @@ class BERTDataloader():
         if mode == 'val':
             dataset = BERTValidDataset(self.train, self.val, self.max_len, self.CLOZE_MASK_TOKEN, self.val_negative_samples)
         elif mode == 'test':
-            dataset = BERTTestDataset(self.train, self.val, self.test, self.max_len, self.CLOZE_MASK_TOKEN, self.test_negative_samples)
+            dataset = BERTTestDataset(
+                self.train, 
+                self.val, 
+                self.test, 
+                self.max_len, 
+                self.CLOZE_MASK_TOKEN, 
+                self.test_negative_samples,
+                test_users=None,
+                args=self.args
+            )
         return dataset
 
 '''
@@ -200,18 +209,40 @@ class BERTValidDataset(data_utils.Dataset):
 
 
 class BERTTestDataset(data_utils.Dataset):
-    def __init__(self, u2seq, u2val, u2answer, max_len, mask_token, negative_samples, test_users=None):
+    def __init__(self, u2seq, u2val, u2answer, max_len, mask_token, negative_samples, test_users=None, args=None):
+        self.args = args
         self.u2seq = u2seq  # train
         self.u2val = u2val  # val
+        self.u2answer = u2answer  # test
         if not test_users:
             self.users = sorted(self.u2seq.keys())
         else:
             self.users = test_users
-        self.users = sorted(self.u2seq.keys())
-        self.u2answer = u2answer  # test
+        
         self.max_len = max_len
         self.mask_token = mask_token
         self.negative_samples = negative_samples
+        self.use_filtered = self.args.filter_unseen_items
+
+    def filter_unseen_items(self, all_train_items):
+        # if all_train_items is None:
+        #     # 收集所有训练序列中出现的物品
+        #     all_train_items = set()
+        #     for user_seq in self.u2seq.values():
+        #         all_train_items.update(user_seq)
+                
+        # 过滤掉未在任何训练序列中出现的测试项
+        filtered_u2answer = {}
+        for user in self.users:
+            test_items = self.u2answer[user]
+            # 只保留在任意训练序列中出现过的测试项
+            filtered_test_items = [item for item in test_items if item in all_train_items]
+            if filtered_test_items:  # 只保留有符合条件测试项的用户
+                filtered_u2answer[user] = test_items
+        
+        # 更新用户列表，只包含有符合条件测试项的用户
+        self.users = sorted(filtered_u2answer.keys())
+        self.filtered_u2answer = filtered_u2answer
 
     def __len__(self):
         return len(self.users)
@@ -219,7 +250,8 @@ class BERTTestDataset(data_utils.Dataset):
     def __getitem__(self, index):
         user = self.users[index]
         seq = self.u2seq[user] + self.u2val[user]  # append validation item after train seq
-        answer = self.u2answer[user] # test data
+        # answer = self.filtered_u2answer[user] if self.use_filtered else self.u2answer[user]
+        answer = self.u2answer[user]
         negs = self.negative_samples[user]
 
         candidates = answer + negs

@@ -139,6 +139,8 @@ parser.add_argument('--train_batch_size', type=int, default=-1)
 parser.add_argument('--val_batch_size', type=int, default=-1)
 parser.add_argument('--test_batch_size', type=int, default=-1)
 parser.add_argument('--sliding_window_size', type=float, default=0.5)
+parser.add_argument('--filter_unseen_items', action="store_true",
+                    help='whether to filter out test items that have not appeared in any training sequence')
 
 ################
 # NegativeSampler

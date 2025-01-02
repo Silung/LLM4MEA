@@ -80,7 +80,15 @@ class SASDataloader():
         if mode == 'val':
             dataset = SASValidDataset(self.train, self.val, self.max_len, self.val_negative_samples)
         elif mode == 'test':
-            dataset = SASTestDataset(self.train, self.val, self.test, self.max_len, self.test_negative_samples)
+            dataset = SASTestDataset(
+                self.train, 
+                self.val, 
+                self.test, 
+                self.max_len, 
+                self.test_negative_samples,
+                test_users=None,
+                args=self.args
+            )
         return dataset
 
 
@@ -165,21 +173,37 @@ class SASValidDataset(data_utils.Dataset):
 
 
 class SASTestDataset(data_utils.Dataset):
-    def __init__(self, u2seq, u2val, u2answer, max_len, negative_samples, test_users=None):
+    def __init__(self, u2seq, u2val, u2answer, max_len, negative_samples, test_users=None, args=None):
+        self.args = args
         self.u2seq = u2seq  # train
         self.u2val = u2val  # val
+        self.u2answer = u2answer  # test
         if not test_users:
             self.users = sorted(self.u2seq.keys())
         else:
             self.users = test_users
-        self.users = sorted(self.u2seq.keys())
-        self.u2answer = u2answer  # test
+        
         self.max_len = max_len
         self.negative_samples = negative_samples
+        self.use_filtered = self.args.filter_unseen_items
 
+    def filter_unseen_items(self, all_train_items):
+        # 过滤掉未在任何训练序列中出现的测试项
+        filtered_u2answer = {}
+        for user in self.users:
+            test_items = self.u2answer[user]
+            # 只保留在任意训练序列中出现过的测试项
+            filtered_test_items = [item for item in test_items if item in all_train_items]
+            if filtered_test_items:  # 只保留有符合条件测试项的用户
+                filtered_u2answer[user] = test_items
+        
+        # 更新用户列表，只包含有符合条件测试项的用户
+        self.users = sorted(filtered_u2answer.keys())
+        self.filtered_u2answer = filtered_u2answer
+        
     def __len__(self):
         return len(self.users)
-
+    
     def __getitem__(self, index):
         user = self.users[index]
         seq = self.u2seq[user] + self.u2val[user]  # append validation item after train seq
