@@ -316,9 +316,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
             # j_start = len(seqs[0]) - 1
             j_start = 0
             if 'gpt' in self.args.llm:
-                if not os.path.exists('batch_log'):
-                    os.makedirs('batch_log')
-                # temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                if not os.path.exists(f'batch_log_{self.args.id}'):
+                    os.makedirs(f'batch_log_{self.args.id}')
+                # temp_file_path = os.path.join(f'batch_log_{self.args.id}', f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
                 # if self.args.resume and os.path.isfile(temp_file_path):
                 #     with open(temp_file_path, 'rb') as f:
                 #         temp = pickle.load(f)
@@ -434,9 +434,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             candidates = sorted_items_k.unsqueeze(1)
                         # print(f'seqs[0]: {seqs[0]}')
                         if 'gpt' in self.args.llm and not self.args.debug:
-                            if not os.path.exists('batch_log'):
-                                os.makedirs('batch_log')
-                            temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                            if not os.path.exists(f'batch_log_{self.args.id}'):
+                                os.makedirs(f'batch_log_{self.args.id}')
+                            temp_file_path = os.path.join(f'batch_log_{self.args.id}', f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
                             print(f'\rlen of seqs[0]:{len(seqs[0])}')
                             temp = {'seqs': seqs,
                                 'logits': logits,
@@ -555,9 +555,9 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             candidates = sorted_items_k.unsqueeze(1)
                             
                         if 'gpt' in self.args.llm and not self.args.debug:
-                            if not os.path.exists('batch_log'):
-                                os.makedirs('batch_log')
-                            temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                            if not os.path.exists(f'batch_log_{self.args.id}'):
+                                os.makedirs(f'batch_log_{self.args.id}')
+                            temp_file_path = os.path.join(f'batch_log_{self.args.id}', f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
                             print(f'\rlen of seqs[0]:{len(seqs[0])}')
                             temp = {'seqs': seqs,
                                 'logits': logits,
@@ -580,7 +580,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
 
                 elif isinstance(self.bb_model, NARM) or isinstance(self.bb_model, GRU4REC):
                     for j in range(j_start, self.max_len - 1):
-                        print(f'temp_seq len ={len(temp_seq)}')
+                        # print(f'temp_seq len ={len(temp_seq)}')
                         if j == self.init_profile_time - 1 and agent is not None:
                             agent.init_profile(seqs)
                         lengths = torch.tensor([j + 1] * seqs.size(0))
@@ -667,10 +667,10 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
                             candidates = sorted_items_k.unsqueeze(1)
                             
                         if 'gpt' in self.args.llm and not self.args.debug:
-                            if not os.path.exists('batch_log'):
-                                os.makedirs('batch_log')
-                            temp_file_path = os.path.join("batch_log", f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
-                            print(f'\rlen of seqs[0]:{len(seqs[0])}')
+                            if not os.path.exists(f'batch_log_{self.args.id}'):
+                                os.makedirs(f'batch_log_{self.args.id}')
+                            temp_file_path = os.path.join(f'batch_log_{self.args.id}', f"{self.args.dataset_code}_{self.args.bb_model_code}_batch{i}.pkl")
+                            # print(f'\rlen of seqs[0]:{len(seqs[0])}')
                             temp = {'seqs': seqs,
                                 'logits': logits,
                                 'candidates': candidates, 

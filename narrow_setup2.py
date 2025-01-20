@@ -5,14 +5,9 @@ import platform
 import re
 import subprocess
 
-cmd_list = []
-for dataset_name in ['games','steam']:
-    cmd_list += [f'python distill.py --dataset_code {dataset_name} --model_code narm --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 512 --id 0 --num_epochs 300 --val_strategy top1',
-                 f'python distill.py --dataset_code {dataset_name} --model_code narm --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 512 --id 0 --num_epochs 300 --val_strategy top1',
-                 f'python distill.py --dataset_code {dataset_name} --model_code sas --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 512 --id 0 --num_epochs 300 --val_strategy top1',
-                 f'python distill.py --dataset_code {dataset_name} --model_code sas --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 512 --id 0 --num_epochs 300 --val_strategy top1',
-                 f'python distill.py --dataset_code {dataset_name} --model_code bert --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 512 --id 0 --num_epochs 300 --val_strategy top1',
-                 f'python distill.py --dataset_code {dataset_name} --model_code bert --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --few_shot 0 --batch_size 512 --id 0 --num_epochs 300 --val_strategy top1',]
+cmd_list = ['python distill.py --dataset_code steam --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+            'python distill.py --dataset_code steam --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
+            'python distill.py --dataset_code steam --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle']
 
 def gpu_info():
     system = platform.system()

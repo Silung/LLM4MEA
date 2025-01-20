@@ -57,6 +57,7 @@ class Agent():
         else:
             self.his_size = 10
             self.seq_size = 5
+        self.profile = None
             
     def set_history(self, seqs):
         org_items = np.vectorize(self.r_smap.get)(seqs.cpu()) 
@@ -93,10 +94,10 @@ class Agent():
         elif self.args.llm == 'gpt-4o-mini_batch':
             from openai import OpenAI
             
-            if not os.path.exists('batch_log'):
-                os.makedirs('batch_log')
-            batch_input_path = os.path.join('batch_log', f'batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.jsonl')
-            batch_output_path = os.path.join('batch_log', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
+            if not os.path.exists(f'batch_log_{self.args.id}'):
+                os.makedirs(f'batch_log_{self.args.id}')
+            batch_input_path = os.path.join(f'batch_log_{self.args.id}', f'batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.jsonl')
+            batch_output_path = os.path.join(f'batch_log_{self.args.id}', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
             
             if os.path.exists(batch_output_path):
                 with open(batch_output_path, 'r') as f:
@@ -171,7 +172,7 @@ class Agent():
                         break
                     except:
                         print("client.files.content Error")
-                batch_output_path = os.path.join('batch_log', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
+                batch_output_path = os.path.join(f'batch_log_{self.args.id}', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
                 with open(batch_output_path, 'w') as f:
                     f.write(file_response.text)
                 json_lines = file_response.text.strip().split('\n')
@@ -179,10 +180,10 @@ class Agent():
         elif self.args.llm == 'gpt-4o-mini_batch_azure':
             from openai import AzureOpenAI
             
-            if not os.path.exists('batch_log'):
-                os.makedirs('batch_log')
-            batch_input_path = os.path.join('batch_log', f'batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.jsonl')
-            batch_output_path = os.path.join('batch_log', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
+            if not os.path.exists(f'batch_log_{self.args.id}'):
+                os.makedirs(f'batch_log_{self.args.id}')
+            batch_input_path = os.path.join(f'batch_log_{self.args.id}', f'batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.jsonl')
+            batch_output_path = os.path.join(f'batch_log_{self.args.id}', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
             
             if os.path.exists(batch_output_path):
                 with open(batch_output_path, 'r') as f:
@@ -290,17 +291,18 @@ class Agent():
                                 time.sleep(60)
                         v = dict(chat_response.choices[0].message)
                         print(f"Update {k}.")
-                        time.sleep(15)
+                        time.sleep(10)
                     if cc_try == 6:
-                        continue
-                        print(msg[int(k.split('-')[-1])])
-                        print("Answer:")
-                        v = {'content': str(input()), 'role': 'assistant'}
+                        v = {'content': '[None]', 'role': 'assistant'}
+                        # continue
+                        # print(msg[int(k.split('-')[-1])])
+                        # print("Answer:")
+                        # v = {'content': str(input()), 'role': 'assistant'}
                     id2msg[k] = v
                     loaded_data[i]['response']['body']['choices'][0]['message'] = v
                     json_lines[i] = json.dumps(loaded_data[i])
                     
-                batch_output_path = os.path.join('batch_log', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
+                batch_output_path = os.path.join(f'batch_log_{self.args.id}', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
                 with open(batch_output_path, 'w') as f:
                     # f.write(file_response.text)
                     f.write('\n'.join(json_lines))
@@ -562,12 +564,16 @@ class SeqAgent(Agent):
                 ex_items_head = sep.join(self.watched_items[i][:ex_len//2])
                 ex_items_tail = sep.join(self.watched_items[i][ex_len//2:])
                 # print(len(', '.join(self.watched_items[i][-5:])))
+                if self.profile is None:
+                    character = ''
+                else:
+                    character = self.profile[i]
                 if self.dataset_code == 'ml-1m':
                     # output.append([{"role": "user", "content": f'This is the viewing history of a certain user: {self.history[j]}. You are a user with your own hobbies, and you have saw {ex_items}. Now, I want to recommend a few more movies to you: {text}. Select 10 movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words! '}])
                     # output.append([{"role": "user", "content": f'You have saw {ex_items_head}...{ex_items_tail}. I want to recommend a few more movies to you: {text}. Select {self.seq_size} movies from them, then return the titles in the order you plan to watch in the format of python list. Make sure not to choose movies you have watched and only answer the title without other words!  Note that one user only accesses a few specific categories of items, and please follow the preferences reflected in history.'}])
-                    output.append([{"role": "user", "content": f"{self.profile[i]} Based on these preferences, select {self.seq_size} movies from the list below. Return only the selected movie titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously watched movies: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}."}])
+                    output.append([{"role": "user", "content": f"{character} Based on these preferences, select {self.seq_size} movies from the list below. Return only the selected movie titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously watched movies: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}."}])
                 elif self.dataset_code in ['beauty', 'games']:
-                    output.append([{"role": "user", "content": f"{self.profile[i]} Based on these preferences, select {self.seq_size} items from the list below. Return only the selected items titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously watched items: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}."}])
+                    output.append([{"role": "user", "content": f"{character} Based on these preferences, select {self.seq_size} items from the list below. Return only the selected items titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously watched items: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}."}])
                 elif self.dataset_code == 'steam':
                     # last update 
                     # output.append([{"role":"system", "content":"You are a user of the Steam, a video game digital distribution service and storefront, and want to purchase your next game."}, 
@@ -583,7 +589,7 @@ class SeqAgent(Agent):
                     {"role":"assistant", "content": "['Black Desert Online', 'Deadly Premonition: The Director's Cut', 'Why Am I Dead At Sea', 'The Chosen RPG', ...]"},
                     {"role":"user", "content": 'This user seems to enjoy a diverse mix of strategy, simulation, indie, and narrative-driven games, with a preference for engaging, sometimes quirky or unconventional experiences across various genres. Based on these preferences, select 5 games from the list below. Return only the selected game titles in the Python list format with pure text (e.g., [\'title1\', \'title2\']). Respond with only the titles! Previously viewed games: theHunter Classic, Omerta - City of Gangsters, The Tiny Bang Story, Sleeping Dogs: Definitive Edition, eden*, A Bird Story, Cloudbuilt, Recettear: An Item Shop\'s Tale, RUNNING WITH RIFLES, Iron Snout, Plague Inc: Evolved, Verdun, Reigns, N++ (NPLUSPLUS), FTL: Faster Than Light, Clustertruck, Gone Home, Poker Night 2, Poker Night 2, The Wild Eight. Here are your recommendations: {"1": "Barony", "2": "Star Wars: Battlefront 2 (Classic, 2005)", "3": "Absolver", "4": "Portal 2", "5": "South Park\\u2122: The Stick of Truth\\u2122", "6": "Minimum", "7": "The Vanishing of Ethan Carter", "8": "Trove", "9": "Portal 2", "10": "Team Fortress 2", "11": "Rochard", "12": "Prison Architect", "13": "Black Mesa", "14": "Lords Of The Fallen\\u2122", "15": "Age of Empires II HD", "16": "Papers, Please", "17": "Skullgirls", "18": "Europa Universalis IV", "19": "Mount &amp; Blade: Warband", "20": "Estranged: Act I", "21": "WARMODE", "22": "Middle-earth\\u2122: Shadow of Mordor\\u2122", "23": "Weapon Shop Fantasy", "24": "Just Cause 2: Multiplayer Mod", "25": "Hellblade: Senua\'s Sacrifice", "26": "Alicemare", "27": "Mount &amp; Blade: Warband", "28": "Wolfenstein II: The New Colossus", "29": "The Elder Scrolls\\u00ae Online: Tamriel Unlimited\\u2122", "30": "The Sims\\u2122 3", ...}.'},
                     {"role":"assistant", "content": "['Star Wars: Battlefront 2 (Classic, 2005)', 'Absolver', 'Europa Universalis IV', 'Wolfenstein II: The New Colossus', 'Weapon Shop Fantasy', ...]"},
-                    {"role": "user", "content": f"{self.profile[i]} Based on these preferences, select {self.seq_size} games from the list below.  Return only the selected game titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously viewed games: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}"}])
+                    {"role": "user", "content": f"{character} Based on these preferences, select {self.seq_size} games from the list below.  Return only the selected game titles in the Python list format with pure text (e.g., ['title1', 'title2']). Respond with only the titles! {cases_txt}Previously viewed games: {ex_items_head}...{ex_items_tail}. Here are your recommendations: {text}"}])
         if self.mem is None:
             self.mem = [[] for i in range(len(titles))]
         if self.watched_items is None:
@@ -620,6 +626,9 @@ class SeqAgent(Agent):
         if self.args.llm == 'llama':
             text = [ans['generation']['content'] for ans in received_data]
         elif 'gpt' in self.args.llm:
+            for ans in received_data:
+                if 'content' not in ans:
+                    print(ans)
             text = [ans['content'] for ans in received_data]
         else:
             raise NotImplementedError()
