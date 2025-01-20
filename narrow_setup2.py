@@ -5,9 +5,13 @@ import platform
 import re
 import subprocess
 
-cmd_list = ['python distill.py --dataset_code steam --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
-            'python distill.py --dataset_code steam --model_code sas --bb_model_code sas --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle',
-            'python distill.py --dataset_code steam --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 31 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1 --gen_data_only --device cpu --no_shuffle']
+cmd_list = []
+for data_name in ['beauty', 'games', 'steam']:
+    for arch1 in ['narm', 'sas', 'bert']:
+        for arch2 in ['narm', 'sas', 'bert']:
+            if arch1 != arch2:
+                val = 'decay' if data_name == 'beauty' else 'top1'
+                cmd_list.append(f'python distill.py --dataset_code {data_name} --model_code {arch1} --bb_model_code {arch2} --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 512 --id 51 --few_shot 0 --num_epochs 300 --val_strategy {val} > temp/{data_name}_model_code_{arch1}_bb_model_code_{arch2}.txt')
 
 def gpu_info():
     system = platform.system()
@@ -29,7 +33,7 @@ def narrow_setup(cmd, interval=2):
     while True:
         gpus_memorys, gpus_util = gpu_info()
         for idx, (gpu_memory, gpu_util) in enumerate(zip(gpus_memorys, gpus_util)):
-            if gpu_util > 30 or gpu_memory > 3000 :  # set waiting condition
+            if gpu_util > 30 or gpu_memory > 6000 :  # set waiting condition
                 # symbol = 'monitoring ' + '>' * idx + ' ' * (10 - i - 1) + '|'
                 # gpu_power_str = 'gpu power%d W |' % gpu_power
                 gpu_memory_str = 'gpu memory: %d MiB ' % gpu_memory

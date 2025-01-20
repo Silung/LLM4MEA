@@ -5,14 +5,15 @@ import platform
 import re
 import subprocess
 
-cmd_list = ['python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 710 -k 10 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu',
-            'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 720 -k 20 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu',
-            'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 750 -k 50 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu',
-            'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 7200 -k 200 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu',
-            'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 7500 -k 500 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu',
-            'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 71000 -k 1000 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu']
+cmd_list = ['python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 1024 --id 711 -k 10 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay',
+            'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 1024 --id 721 -k 20 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay',
+            'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 1024 --id 751 -k 50 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay',
+            'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 1024 --id 7201 -k 200 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay']
 
-# cmd_list = ['python distill.py --dataset_code steam --model_code bert --bb_model_code bert --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 512 --id 33 --few_shot 3 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy top1']
+            # 'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 7500 -k 500 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu',
+            # 'python distill.py --dataset_code beauty --model_code narm --bb_model_code narm --num_generated_seqs 5001 --generated_sampler llm_seq --batch_size 5001 --id 71000 -k 1000 --few_shot 0 --num_epochs 300 --llm gpt-4o-mini_batch_azure --val_strategy decay --gen_data_only --device cpu']
+
+
 def gpu_info():
     system = platform.system()
     gpus_memory = []

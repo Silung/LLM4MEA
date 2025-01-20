@@ -13,7 +13,7 @@ from fuzzywuzzy import process
 from tqdm import trange
 from datetime import datetime
 import traceback
-
+import requests
 
 from datasets import dataset_factory
 
@@ -66,31 +66,21 @@ class Agent():
         
     def send_rev(self, msg):
         self.call_cc += 1
-        if self.args.llm == 'llama':
-            # 创建TCP socket
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            
-            # 连接服务器
-            client_socket.connect(('localhost', self.args.port))
-            
-            # 创建字典
+        if self.args.llm == 'llama' or self.args.llm == 'Mistral-7B-Instruct-v0.3':
+            # 使用requests发送POST请求
+            url = f'http://localhost:{self.args.port}'
+            headers = {'Content-Type': 'application/json'}
             data_to_send = msg
             
-            # 序列化字典为JSON格式
-            data_to_send_json = json.dumps(data_to_send)
+            if self.args.debug:
+                print(f'len(json.dumps(data_to_send)): {len(json.dumps(data_to_send))}')
+            # 发送请求并获取响应
+            response = requests.post(url, 
+                                  headers=headers,
+                                  json=data_to_send)
             
-            # print(data_to_send_json)
-            # 发送数据
-            client_socket.send(data_to_send_json.encode())
-            # 接收数据
-            received_data = client_socket.recv(40960).decode()
-            
-            print(received_data)
-            
-            # 关闭连接
-            client_socket.close()
-            
-            received_data = json.loads(received_data)
+            # 解析响应数据
+            received_data = response.json()
         elif self.args.llm == 'gpt-4o-mini_batch':
             from openai import OpenAI
             
@@ -177,7 +167,9 @@ class Agent():
                     f.write(file_response.text)
                 json_lines = file_response.text.strip().split('\n')
             
-        elif self.args.llm == 'gpt-4o-mini_batch_azure':
+        elif self.args.llm == 'gpt-4o-mini_batch_azure' or self.args.llm == 'gpt-4o_batch_azure':
+            batch_model_name = {'gpt-4o-mini_batch_azure': 'gpt-4o-mini', 'gpt-4o_batch_azure': 'gpt-4o'}[self.args.llm]
+            chat_model_name = {'gpt-4o-mini_batch_azure': 'gpt-4o-mini-chat', 'gpt-4o_batch_azure': 'gpt-4o-chat'}[self.args.llm]
             from openai import AzureOpenAI
             
             if not os.path.exists(f'batch_log_{self.args.id}'):
@@ -195,7 +187,7 @@ class Agent():
                 if not os.path.exists(batch_input_path):
                     with open(batch_input_path, 'w') as f:
                         for idx, m in enumerate(msg):
-                            d = {"custom_id": f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}", "method": "POST", "url": "/chat/completions", "body": {"model": "gpt-4o-mini", "messages": m}}
+                            d = {"custom_id": f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}", "method": "POST", "url": "/chat/completions", "body": {"model": batch_model_name, "messages": m}}
                             # print(d)
                             f.write(json.dumps(d) + '\n')
                 
@@ -284,7 +276,7 @@ class Agent():
                         m = msg[int(k.split('-')[-1])]
                         while True:
                             try:
-                                chat_response = client.chat.completions.create(model="gpt-4o-mini-chat", messages=m)
+                                chat_response = client.chat.completions.create(model=chat_model_name, messages=m)
                                 break
                             except:
                                 print(f"Update {k} failed.")
@@ -312,7 +304,7 @@ class Agent():
                 print(f'Fails id: {list(e)}')
             received_data = [id2msg[f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}"] for idx in range(len(msg))]
             # received_data = [id2msg[idx] for idx in ['request-1', 'request-2']]
-        
+
         elif self.args.llm == 'gpt-test':
             batch_output_path = os.path.join('batch_log.old', f'batch_output_steam_narm_0.txt')
             with open(batch_output_path, 'r') as f:
@@ -322,6 +314,168 @@ class Agent():
             id2msg = {data['custom_id']:data['response']['body']['choices'][0]['message'] for data in loaded_data}
             received_data = [id2msg[f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}"] for idx in range(len(msg))]
         # print(received_data)
+        elif self.args.llm == 'qianfan-llama3-8b-instruct':
+            from qianfan.resources.console.data import Data
+            
+            if not os.path.exists(f'batch_log_{self.args.id}'):
+                os.makedirs(f'batch_log_{self.args.id}')
+            batch_input_path = os.path.join(f'batch_log_{self.args.id}', f'batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.jsonl')
+            batch_output_path = os.path.join(f'batch_log_{self.args.id}', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
+            
+            if os.path.exists(batch_output_path):
+                with open(batch_output_path, 'r') as f:
+                    text = f.read()
+                json_lines = text.strip().split('\n')
+                loaded_data = [json.loads(line) for line in json_lines]
+                id2msg = {data['id']: data['output']['result'] for data in loaded_data}
+            else:
+                # 准备输入数据
+                if not os.path.exists(batch_input_path):
+                    with open(batch_input_path, 'w') as f:
+                        for idx, m in enumerate(msg):
+                            d = {"id": f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}", "request_body": {"messages": m}}
+                            f.write(json.dumps(d) + '\n')
+                
+                # 初始化BosClient
+                from baidubce.bce_client_configuration import BceClientConfiguration
+                from baidubce.auth.bce_credentials import BceCredentials
+                from baidubce.services.bos.bos_client import BosClient
+
+                # 设置BosClient的Host，Access Key ID和Secret Access Key
+                bos_host = "bj.bcebos.com"
+                access_key_id = os.getenv("QIANFAN_ACCESS_KEY")
+                secret_access_key = os.getenv("QIANFAN_SECRET_KEY")
+
+                # 创建BceClientConfiguration
+                config = BceClientConfiguration(credentials=BceCredentials(access_key_id, secret_access_key), endpoint=bos_host)
+
+                # 新建BosClient
+                bos_client = BosClient(config)
+
+                # 上传输入文件到BOS
+                bucket_name = "rea-llama"
+                object_key = f"batch_log_{self.args.id}/batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}/input.jsonl"
+                bos_client.put_object_from_file(bucket_name, object_key, batch_input_path)
+
+                # 上传测试文件到输出位置
+                output_object_key = f"batch_log_{self.args.id}/batch_output/test.txt"
+                bos_client.put_object_from_string(bucket_name, output_object_key, "test")
+
+                # 创建批量推理任务
+                try:
+                    task = Data.create_offline_batch_inference_task(
+                        name=f"{self.args.dataset_code}-{self.args.bb_model_code}-{self.call_cc}",
+                        description=f"{self.args.dataset_code}-{self.args.bb_model_code}-{self.call_cc}",
+                        modelId="amv-at4dp2kj9f5h", 
+                        inference_params={
+                            "temperature": 0.7,
+                            "top_p": 0.9
+                        },
+                        input_bos_uri=f"bos:/rea-llama/batch_log_{self.args.id}/batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}/",
+                        output_bos_uri=f"bos:/rea-llama/batch_log_{self.args.id}/batch_output/",
+                        ak=access_key_id,
+                        sk=secret_access_key
+                    )
+                    
+                    task_id = task['result']['taskId']
+                    print(f"Created batch task: {task_id}")
+                    
+                    # 获取批量预测任务详情
+                    task_info = Data.get_offline_batch_inference_task(task_id=task_id)
+                    status = task_info['result']['runStatus']
+                    while status not in ['Done', 'Failed', 'Expired']:
+                        time.sleep(60)
+                        task_info = Data.get_offline_batch_inference_task(task_id=task_id)
+                        status = task_info['result']['runStatus']
+                    
+                    if status == 'Failed':
+                        error_code = task_info['result'].get('errorCode')
+                        error_reason = task_info['result'].get('errorReason')
+                        raise Exception(f'Task failed with status: {status}, error code: {error_code}, reason: {error_reason}')
+                    
+                    # 从BOS下载结果文件
+                    output_object_key = f"batch_log_{self.args.id}/batch_output/{task_info['result']['outputDir']}/input.jsonl"
+                    bos_client.get_object_to_file(bucket_name, output_object_key, batch_output_path)
+                    
+                    # 读取结果
+                    with open(batch_output_path, 'r') as f:
+                        text = f.read()
+                    json_lines = text.strip().split('\n')
+                    loaded_data = [json.loads(line) for line in json_lines]
+                    id2msg = {data['id']: data['output']['result'] for data in loaded_data}
+                    
+                except Exception as e:
+                    print(f'Batch inference failed: {e}')
+                    traceback.print_exc()
+                    raise e
+            
+            received_data = [id2msg[f"{self.args.dataset_code}-{self.args.bb_model_code}-{idx}"] for idx in range(len(msg))]
+        elif self.args.llm == 'Phi-3-small-8k-instruct':
+            from azure.ai.inference import ChatCompletionsClient
+            from azure.core.credentials import AzureKeyCredential
+            from azure.core.exceptions import HttpResponseError
+            from azure.ai.inference.models import SystemMessage, UserMessage, AssistantMessage
+            
+            if not os.path.exists(f'batch_log_{self.args.id}'):
+                os.makedirs(f'batch_log_{self.args.id}')
+            batch_input_path = os.path.join(f'batch_log_{self.args.id}', f'batch_input_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.jsonl')
+            batch_output_path = os.path.join(f'batch_log_{self.args.id}', f'batch_output_{self.args.dataset_code}_{self.args.bb_model_code}_{self.call_cc}.txt')
+            
+            if os.path.exists(batch_output_path):
+                with open(batch_output_path, 'r') as f:
+                    text = f.read()
+                json_lines = text.strip().split('\n')
+                loaded_data = [json.loads(line) for line in json_lines]
+                received_data = [data['content'] for data in loaded_data]
+            else:
+                if not os.path.exists(batch_input_path):
+                    with open(batch_input_path, 'w') as f:
+                        for message_list in msg:
+                            f.write(json.dumps({"messages": message_list}) + '\n')
+                # 创建客户端
+                client = ChatCompletionsClient(
+                    endpoint=os.getenv("AZUREAI_ENDPOINT_URL"),
+                    credential=AzureKeyCredential(os.getenv("AZUREAI_ENDPOINT_KEY")),
+                )
+                
+                received_data = []
+                for idx, message_list in enumerate(msg):
+                    print(f'Message {idx+1} of {len(msg)}')
+                    try:
+                        # 根据role转换消息格式
+                        messages = []
+                        for m in message_list:
+                            if m["role"] == "system":
+                                messages.append(SystemMessage(content=m["content"]))
+                            elif m["role"] == "user":
+                                messages.append(UserMessage(content=m["content"]))
+                            elif m["role"] == "assistant":
+                                messages.append(AssistantMessage(content=m["content"]))
+                        
+                        response = client.complete(messages=messages)
+                        received_data.append(response.choices[0].message.content)
+                    except HttpResponseError as ex:
+                        if ex.status_code == 400:
+                            response = json.loads(ex.response._content.decode('utf-8'))
+                            if isinstance(response, dict) and "error" in response:
+                                print(f"Error {response['error']['code']}: {response['error']['message']}")
+                                received_data.append("[None]")
+                            else:
+                                raise ex
+                        else:
+                            raise ex
+                    time.sleep(1)  # 添加延迟避免请求过快
+                    
+                # 保存结果
+                with open(batch_output_path, 'w') as f:
+                    for content in received_data:
+                        f.write(json.dumps({"content": content}) + '\n')
+        elif self.args.llm == 'Qwen2.5-7B-Instruct':
+            # TODO
+            raise NotImplementedError()
+        else:
+            raise NotImplementedError()
+        
         return received_data
     
     def encode(self, sorted_items):
@@ -445,8 +599,8 @@ class Agent():
         received_data = self.send_rev(query)
         if self.args.debug:
             print('LLM input and output:')
-            print(query[0])
-            print(received_data[0])
+            print(query)
+            print(received_data)
             print()
         selected_indices = self.decode(received_data)
         # shape: [B], index start with 1.
@@ -515,6 +669,8 @@ class SeqAgent(Agent):
         elif self.dataset_code in ['beauty']:
             texts = np.vectorize(join2, signature='(n)->()')(titles)
         
+        if self.args.debug:
+            print(f'len(titles[0]): {len(titles[0])}')
         try:
             if self.args.cases_path is not None:
                 with open(self.args.cases_path,'r') as f:
@@ -630,6 +786,15 @@ class SeqAgent(Agent):
                 if 'content' not in ans:
                     print(ans)
             text = [ans['content'] for ans in received_data]
+        elif self.args.llm == 'qianfan-llama3-8b-instruct':
+            text = received_data
+        elif self.args.llm == 'Phi-3-small-8k-instruct':
+            text = received_data
+        elif self.args.llm == 'Qwen2.5-7B-Instruct':
+            # TODO
+            raise NotImplementedError()
+        elif self.args.llm == 'Mistral-7B-Instruct-v0.3':
+            text = received_data
         else:
             raise NotImplementedError()
 
@@ -680,6 +845,15 @@ class SeqAgent(Agent):
             self.profile = [ans['generation']['content'] for ans in received_data]
         elif 'gpt' in self.args.llm:
             self.profile = [ans['content'] for ans in received_data]
+        elif self.args.llm == 'qianfan-llama3-8b-instruct':
+            self.profile = received_data
+        elif self.args.llm == 'Phi-3-small-8k-instruct':
+            self.profile = received_data
+        elif self.args.llm == 'Qwen2.5-7B-Instruct':
+            # TODO
+            raise NotImplementedError()
+        elif self.args.llm == 'Mistral-7B-Instruct-v0.3':
+            self.profile = received_data
         else:
             raise NotImplementedError()
         

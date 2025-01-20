@@ -2,9 +2,9 @@ import os
 import pickle
 import random
 
-root = '/data/zhaoshilong/REA_with_llm/gen_data/steam/bert_5001_100'
+root = '/data/zhaoshilong/REA_with_llm/gen_data/beauty/narm_5001_100'
 # paths = [f'llm_seq{i}_dataset.pkl' for i in range(15,20)]
-paths = ['llm_seq31_dataset.pkl', 'random0_dataset.pkl']
+paths = ['llm_seq100_dataset.pkl', 'random0_dataset.pkl']
 print(root)
 print(paths)
 datasets = []
@@ -13,7 +13,7 @@ for path in paths:
          datasets.append(pickle.load(f))
     
 k = 5001  # 总样本数
-n = 601
+n = 2512
 
 # 从每个数据集中随机抽取样本
 seqs0, logits0, candidates0 = [], [], []
@@ -43,5 +43,5 @@ dataset3 = {'seqs':seqs[:k], 'logits':logits[:k], 'candidates':candidates[:k]}
 print(f'len(dataset3):{len(dataset3)}')
 print(f'len(dataset3["seqs"]):{len(dataset3["seqs"])}')
 
-with open(os.path.join(root, 'llm_seq33_dataset.pkl'), 'wb') as f:
+with open(os.path.join(root, 'llm_seq101_dataset.pkl'), 'wb') as f:
     pickle.dump(dataset3, f)

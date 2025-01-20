@@ -11,6 +11,8 @@
 .DS_Store
 temp.*
 temp_*
+temp/*
+fonts/*
 
 /.ipynb_checkpoints/*
 /.vscode/*

@@ -232,7 +232,15 @@ parser.add_argument('--debug', action="store_true")
 parser.add_argument('--noise', action="store_true")
 parser.add_argument('--resume', action="store_true")
 parser.add_argument('--aug', action="store_true")
-parser.add_argument('--llm', type=str, default='llama', choices=['llama', 'gpt-4o-mini_batch', 'gpt-4o-mini_batch_azure','gpt-test'])
+parser.add_argument('--llm', type=str, default='llama', choices=['llama', 
+                                                                 'gpt-4o-mini_batch', 
+                                                                 'gpt-4o-mini_batch_azure',
+                                                                 'gpt-4o_batch_azure',
+                                                                 'gpt-test',
+                                                                 'qianfan-llama3-8b-instruct', 
+                                                                 'Phi-3-small-8k-instruct',
+                                                                 'Qwen2.5-7B-Instruct',
+                                                                 'Mistral-7B-Instruct-v0.3'])
 parser.add_argument('--val_strategy', type=str, default='top1', choices=['top1', 'decay'])
 
 
