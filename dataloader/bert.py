@@ -1,6 +1,6 @@
 from .base import AbstractDataloader
 from .negative_samplers import negative_sampler_factory
-
+import copy
 import torch
 import random
 import torch.utils.data as data_utils
@@ -88,6 +88,7 @@ class BERTDataloader():
                 self.max_len, 
                 self.CLOZE_MASK_TOKEN, 
                 self.test_negative_samples,
+                self.item_count,
                 test_users=None,
                 args=self.args
             )
@@ -209,7 +210,7 @@ class BERTValidDataset(data_utils.Dataset):
 
 
 class BERTTestDataset(data_utils.Dataset):
-    def __init__(self, u2seq, u2val, u2answer, max_len, mask_token, negative_samples, test_users=None, args=None):
+    def __init__(self, u2seq, u2val, u2answer, max_len, mask_token, negative_samples, item_count, test_users=None, args=None):
         self.args = args
         self.u2seq = u2seq  # train
         self.u2val = u2val  # val
@@ -223,6 +224,7 @@ class BERTTestDataset(data_utils.Dataset):
         self.mask_token = mask_token
         self.negative_samples = negative_samples
         self.use_filtered = self.args.filter_unseen_items
+        self.item_count = item_count
 
     def filter_unseen_items(self, all_train_items):
         # if all_train_items is None:
@@ -250,6 +252,13 @@ class BERTTestDataset(data_utils.Dataset):
     def __getitem__(self, index):
         user = self.users[index]
         seq = self.u2seq[user] + self.u2val[user]  # append validation item after train seq
+        if self.args.dis_loc:
+            seq_dis = copy.deepcopy(seq)
+            seq_dis[self.args.dis_loc] = random.randint(1, self.item_count)
+            seq_dis = seq_dis + [self.mask_token]
+            seq_dis = seq_dis[-self.max_len:]
+            padding_len = self.max_len - len(seq_dis)
+            seq_dis = [0] * padding_len + seq_dis
         # answer = self.filtered_u2answer[user] if self.use_filtered else self.u2answer[user]
         answer = self.u2answer[user]
         negs = self.negative_samples[user]
@@ -262,4 +271,7 @@ class BERTTestDataset(data_utils.Dataset):
         padding_len = self.max_len - len(seq)
         seq = [0] * padding_len + seq
 
-        return torch.LongTensor(seq), torch.LongTensor(candidates), torch.LongTensor(labels)
+        if self.args.dis_loc:
+            return torch.LongTensor(seq), torch.LongTensor(seq_dis)
+        else:
+            return torch.LongTensor(seq), torch.LongTensor(candidates), torch.LongTensor(labels)
