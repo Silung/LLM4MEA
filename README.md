@@ -4,11 +4,11 @@ This work aims to improve model extraction attacks (MEAs) on sequential recommen
 
 Black-box attacks in prior Model Extraction Attacks (MEAs) are ineffective at exposing recommender system vulnerabilities due to random sampling in data selection, which leads to misaligned synthetic and real-world distributions. 
 
-<img src="./figs/intro.svg" width="600"/>
+<p align="center"><img src="./figs/intro.svg" width="600"/></p>
 
 Different methods (Random, [DFME](https://github.com/Yueeeeeeee/RecSys-Extraction-Attack) and Ours) generate surrogate data with varying distributions. Compared to secret data, Random data lacks specific patterns, while DFME suffers from over/under-exposure. 
 
-<img src="./figs/intro1.svg" width="800"/>
+<p align="center"><img src="./figs/intro1.svg" width="800"/></p>
 
 To overcome this limitation, we propose LLM4MEA, a novel model extraction method that leverages Large Language Models (LLMs) as human-like rankers to generate data. 
 It generates data with high coverage and a smaller gap through interactions between the LLM ranker and target recommender system.
