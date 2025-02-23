@@ -182,7 +182,8 @@ class RNNTestDataset(data_utils.Dataset):
         tokens = (self.u2seq[user] + self.u2val[user])[-self.max_len:]  # append validation item after train seq
         if self.args.dis_loc:
             tokens_dis = copy.deepcopy(tokens)
-            tokens_dis[self.args.dis_loc] = random.randint(1, self.item_count)
+            # tokens_dis[self.args.dis_loc] = random.randint(1, self.item_count)
+            random.shuffle(tokens_dis)
             length = len(tokens_dis)
             tokens_dis = tokens_dis + [0] * (self.max_len - length)
 

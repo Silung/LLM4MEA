@@ -4,7 +4,7 @@ import random
 
 root = '/data/zhaoshilong/REA_with_llm/gen_data/beauty/narm_5001_100'
 # paths = [f'llm_seq{i}_dataset.pkl' for i in range(15,20)]
-paths = ['llm_seq100_dataset.pkl', 'random0_dataset.pkl']
+paths = ['llm_seq110_dataset.pkl', 'random0_dataset.pkl']
 print(root)
 print(paths)
 datasets = []
@@ -43,5 +43,5 @@ dataset3 = {'seqs':seqs[:k], 'logits':logits[:k], 'candidates':candidates[:k]}
 print(f'len(dataset3):{len(dataset3)}')
 print(f'len(dataset3["seqs"]):{len(dataset3["seqs"])}')
 
-with open(os.path.join(root, 'llm_seq101_dataset.pkl'), 'wb') as f:
+with open(os.path.join(root, 'llm_seq111_dataset.pkl'), 'wb') as f:
     pickle.dump(dataset3, f)

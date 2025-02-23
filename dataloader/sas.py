@@ -211,7 +211,8 @@ class SASTestDataset(data_utils.Dataset):
         seq = self.u2seq[user] + self.u2val[user]  # append validation item after train seq
         if self.args.dis_loc:
             seq_dis = copy.deepcopy(seq)
-            seq_dis[self.args.dis_loc] = random.randint(1, self.item_count)
+            # seq_dis[self.args.dis_loc] = random.randint(1, self.item_count)
+            random.shuffle(seq_dis)
             seq_dis = seq_dis[-self.max_len:]
             padding_len = self.max_len - len(seq_dis)
             seq_dis = [0] * padding_len + seq_dis
