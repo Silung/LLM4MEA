@@ -4,7 +4,6 @@
 *.pth
 *.gz
 *.tmp
-*.pdf
 *.docx
 *.pptx
 *.gz
