@@ -1,9 +1,11 @@
-# LLM4MEA: Black box Model Extraction Attacks on Sequential Recommenders via Large Language Models
+# LLM4MEA: Black box Model Extraction Attacks on Sequential Recommenders via Large Language Models \[[Paper Here](paper.pdf)\]
 <div align="center">
 <a href='https://arxiv.org/abs/XXXXX'><img src='https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg'></a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
  <a href='https://github.com/buaacyw/GaussianEditor/blob/master/LICENSE.txt'><img src='https://img.shields.io/badge/License-MIT-blue'></a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
  <a href="https://twitter.com/XXXX"><img src="https://img.shields.io/twitter/follow/XXXX?style=social" alt="Twitter Follow"></a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </div>
+
+
 
 ## 🔆 Introduction
 This work aims to improve model extraction attacks (MEAs) on sequential recommender systems by generating more realistic synthetic data with Large Language Models (LLMs). 
