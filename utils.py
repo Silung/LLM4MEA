@@ -243,6 +243,10 @@ parser.add_argument('--llm', type=str, default='llama', choices=['llama',
                                                                  'Qwen2.5-7B-Instruct',
                                                                  'Mistral-7B-Instruct-v0.3'])
 parser.add_argument('--val_strategy', type=str, default='top1', choices=['top1', 'decay'])
+parser.add_argument('--defence_ratio', type=float, default=0)
+parser.add_argument('--defence_newitem_ratio', type=float, default=0)
+
 
 
 args = parser.parse_args()
+

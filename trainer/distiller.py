@@ -95,6 +95,28 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         self.left_items = set(range(1, self.num_items+1))
 
     def calculate_loss(self, seqs, labels, candidates, lengths=None, gts=None):
+        # 对candidates的最后一个维度进行随机打乱
+        # defence实验
+        if self.args.defence_ratio > 0:
+            # 获取candidates的形状
+            # print('Defence Experiment')
+            batch_size, seq_len = candidates.shape
+            # 对每个序列单独打乱
+            for i in range(int(min(1, self.args.defence_ratio) * batch_size)):
+                perm = torch.randperm(seq_len)
+                candidates[i] = candidates[i][perm]
+                labels[i] = labels[i][perm]
+        if self.args.defence_newitem_ratio > 0:
+            # 计算需要扰动的项数
+            num_items_to_disturb = int(self.args.defence_newitem_ratio * candidates.size(-1))
+            # 对每个序列进行扰动
+            for i in range(candidates.size(0)):
+                # 随机选择需要扰动的索引
+                disturb_indices = torch.randperm(candidates.size(-1))[:num_items_to_disturb]
+                # 对选中的索引进行随机扰动
+                for j in disturb_indices:
+                    candidates[i, j] = torch.randint(1, self.num_items + 1, (1,))
+
         if isinstance(self.model, BERT) or isinstance(self.model, SASRec):
             logits = self.model(seqs)[:, -1, :]
         elif isinstance(self.model, NARM) or isinstance(self.model, GRU4REC):
@@ -711,7 +733,7 @@ class NoDataRankDistillationTrainer(metaclass=ABCMeta):
         dataset.save_dataset(batch_tokens.tolist(), batch_logits.tolist(), batch_candidates.tolist(), gts.tolist())
         # print(agent.position_cc)
         if agent:
-            np.save(f'position_cc_{self.args.generated_sampler}_{self.args.dataset_code}_{self.args.model_code}_{self.args.bb_model_code}_{self.args.id}_shuffle={not self.args.no_shuffle}_{self.args.llm}.npy', np.array(agent.position_cc))
+            np.save(f'temp/position_cc_{self.args.generated_sampler}_{self.args.dataset_code}_{self.args.model_code}_{self.args.bb_model_code}_{self.args.id}_shuffle={not self.args.no_shuffle}_{self.args.llm}.npy', np.array(agent.position_cc))
 
     def train(self):        
         accum_iter = self.last_accum_iter
